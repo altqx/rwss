@@ -666,9 +666,9 @@ dependencies = [
 
 [[package]]
 name = "rassa"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efdab871466812fdba41baf65191158de3b7f49aef62a68cd496c3f75d0a920f"
+checksum = "3189dd2fffeea335c035873861425938d8c0688f6bd4c33db31a568e3db36141"
 dependencies = [
  "rassa-capi",
  "rassa-core",
@@ -679,9 +679,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-capi"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae705890af889e36a46806887d03cd65b948c64e962167d7a5953d1b3a139a6f"
+checksum = "6f8705cb89f51f8266859c0aac9d5542410150ec8cda6e33151ea4a0dbf3ca4b"
 dependencies = [
  "libc",
  "rassa-core",
@@ -692,15 +692,15 @@ dependencies = [
 
 [[package]]
 name = "rassa-core"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83c165757f387990ab89b84f5c54e03b5e225f30f31e297bbeac247cff11533c"
+checksum = "027b8c47288552162d4231156d46f2ec6c741e34eb43379673937ef9c05d96f7"
 
 [[package]]
 name = "rassa-fonts"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c379ba26855b8890e200f429ba3a0c01c5876cb9fd843a48b246578064e9d0e5"
+checksum = "58a10d82751acf3e8753f0f1e66ca4c6a7e5bfd8999e30901100395727d749c6"
 dependencies = [
  "fontdb",
  "ttf-parser 0.25.1",
@@ -708,9 +708,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-layout"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8780db6783a5430eca2f56bbcc50efdf9f1ae581f348e0f1b0556b284c019bad"
+checksum = "273aa7a95fc19a24fd1b1c500b5e2c8a78a5a072c592241c76df416b151d4878"
 dependencies = [
  "rassa-core",
  "rassa-fonts",
@@ -723,9 +723,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-parse"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e971173ce566a3da5239bb5aed7534dc0f436f1954305596d4e778f78e1a76d"
+checksum = "9f29b88e8f432a3c08f18521b6d5993fb0c0b8ca4822a7130f77d493ceb875e5"
 dependencies = [
  "iconv-native",
  "rassa-core",
@@ -733,7 +733,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-raster"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dabb0c0d7f89ac8745f01fe6db89e5f523a01f2308fccb7d5b5342c439a803a0"
 dependencies = [
  "core-foundation",
  "core-foundation-sys",
@@ -760,9 +762,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-render"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ec6aaf814fce47d4d4888dbae96c41264897b00830caeac24d6633053fa7b9b"
+checksum = "3d312c2e567c888386c14eff9b70fdc57c6f99d59ab3efa6981d8708f480b754"
 dependencies = [
  "rassa-core",
  "rassa-fonts",
@@ -774,7 +776,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-shape"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b010ea228cea334de86c25608ba8344410af9ccc8b69a252f6a08eec6611b2bb"
 dependencies = [
  "harfrust",
  "rassa-core",
@@ -784,9 +788,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-unibreak"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "091f47fb348c075664391712178e4e15adaac4628f33d3c77be07506a17e8e12"
+checksum = "eb33f91191aa873c2a15862536abfeea0037d49f52ba537b16b213c4a4326cbc"
 dependencies = [
  "rassa-core",
  "unicode-linebreak",
@@ -795,9 +799,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-unicode"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1085b4d78fdcd28b78614aaa4790c5fa8456bfaeb22c39abfe0b59316e40424d"
+checksum = "f95cf11d3b090005e9733b7a0cd1f3e964754c3f759cdc06ead60a8d8b95da27"
 dependencies = [
  "rassa-core",
  "rassa-unibreak",

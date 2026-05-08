@@ -15,18 +15,14 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-rassa = "0.4.0"
-rassa-fonts = "0.4.0"
-rassa-shape = "0.4.0"
+rassa = "0.5.0"
+rassa-fonts = "0.5.0"
+rassa-shape = "0.5.0"
 ttf-parser = "0.25"
 wasm-bindgen = "0.2.118"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 console_error_panic_hook = { version = "0.1.7", optional = true }
-
-[patch.crates-io]
-rassa-shape = { path = "vendor/rassa-shape" }
-rassa-raster = { path = "vendor/rassa-raster" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.68"
