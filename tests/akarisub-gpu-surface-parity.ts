@@ -5,15 +5,13 @@ import {
   type WorkerInboundMessage,
   type WorkerOutboundMessage,
   type WorkerInitMessage,
-  type HbGpuShaderMessage,
-  type HbGpuRenderMessage,
   type RenderImage
 } from '../src/index'
 
 const canvas = document.createElement('canvas')
 const options: VideoAssSubtitleOptions = {
   canvas,
-  blendMode: 'hb-gpu',
+  blendMode: 'wasm',
   workerUrl: '/akarisub-worker.js',
   wasmUrl: '/akarisub-worker.wasm',
   renderAhead: 0.008,
@@ -29,20 +27,6 @@ const image: RenderImage = {
   image: new Uint8Array([255, 255, 255, 255])
 }
 
-const shaderMessage: HbGpuShaderMessage = {
-  target: 'hbGpuShaders',
-  wgsl: { vertex: '', fragment: '', drawFragment: '', paintFragment: '' },
-  glsl: { vertex: '', fragment: '', drawFragment: '', paintFragment: '' }
-}
-const renderMessage: HbGpuRenderMessage = {
-  target: 'renderHbGpu',
-  glyphData: new ArrayBuffer(0),
-  atlasData: new ArrayBuffer(0),
-  times: {},
-  width: 1,
-  height: 1,
-  colorSpace: null
-}
 const initMessage: WorkerInitMessage = {
   target: 'init',
   wasmUrl: '/akarisub-worker.wasm',
@@ -64,8 +48,7 @@ const initMessage: WorkerInitMessage = {
   hasBitmapBug: false
 }
 const inbound: WorkerInboundMessage = { target: 'getColorSpace' }
-const outbound: WorkerOutboundMessage = shaderMessage
-void renderMessage
+const outbound: WorkerOutboundMessage = { target: 'ready' }
 void initMessage
 void inbound
 void outbound
@@ -76,8 +59,6 @@ await webgpu.setCanvas(canvas, 1, 1)
 webgpu.updateSize(2, 2)
 webgpu.render([image], 2, 2)
 webgpu.renderBitmaps([], 2, 2)
-webgpu.setHbGpuShaders(shaderMessage)
-webgpu.renderHbGpuBlobs(new ArrayBuffer(0), new ArrayBuffer(0), 2, 2)
 webgpu.clear()
 const webgpuInitialized: boolean = webgpu.initialized
 webgpu.destroy()
@@ -89,8 +70,6 @@ await webgl2.setCanvas(canvas, 1, 1)
 webgl2.updateSize(2, 2)
 webgl2.render([image], 2, 2)
 webgl2.renderBitmaps([], 2, 2)
-webgl2.setHbGpuShaders(shaderMessage)
-webgl2.renderHbGpuBlobs(new ArrayBuffer(0), new ArrayBuffer(0), 2, 2)
 webgl2.clear()
 const webgl2Initialized: boolean = webgl2.initialized
 webgl2.destroy()

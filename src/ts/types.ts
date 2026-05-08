@@ -1,7 +1,7 @@
 export type AssSubtitleFormatName = 'ass'
 export type WrassRendererBackend = 'canvas2d' | 'webgl2' | 'webgpu'
 export type WrassFrameCropMode = 'screen' | 'bounds'
-export type WrassBlendMode = 'js' | 'wasm' | 'hb-gpu'
+export type WrassBlendMode = 'js' | 'wasm'
 
 export interface AssMetadata {
   format: AssSubtitleFormatName
@@ -233,32 +233,6 @@ export interface RenderTimes {
   bitmaps?: number
 }
 
-export interface HbGpuShaderMessage {
-  target: 'hbGpuShaders'
-  wgsl: {
-    vertex: string
-    fragment: string
-    drawFragment: string
-    paintFragment: string
-  }
-  glsl: {
-    vertex: string
-    fragment: string
-    drawFragment: string
-    paintFragment: string
-  }
-}
-
-export interface HbGpuRenderMessage {
-  target: 'renderHbGpu'
-  glyphData: ArrayBuffer
-  atlasData: ArrayBuffer
-  times: RenderTimes
-  width: number
-  height: number
-  colorSpace: string | null
-}
-
 export type WorkerOutboundMessage =
   | { target: 'ready' }
   | { target: 'trackReady' }
@@ -272,8 +246,6 @@ export type WorkerOutboundMessage =
   | { target: 'resetStats'; success: boolean }
   | { target: 'getEventCount'; count: number }
   | { target: 'getStyleCount'; count: number }
-  | HbGpuShaderMessage
-  | HbGpuRenderMessage
   | { target: 'render'; images: RenderImage[]; times: RenderTimes; width: number; height: number; colorSpace: string | null }
 
 export interface WorkerInitMessage {

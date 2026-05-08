@@ -1,4 +1,4 @@
-import type { AssSubtitleData, HbGpuShaderMessage, RenderImage, WrassPlaneData } from './types'
+import type { AssSubtitleData, RenderImage, WrassPlaneData } from './types'
 import { composeAssFrameCpu, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
 
 export interface WebGPURendererOptions {
@@ -104,15 +104,6 @@ export class WebGPURenderer {
     const pass = encoder.beginRenderPass({ colorAttachments: [{ view: texture.createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] })
     pass.end()
     this.device.queue.submit([encoder.finish()])
-  }
-
-  setHbGpuShaders(_shaders: HbGpuShaderMessage | { wgsl: HbGpuShaderMessage['wgsl'] }): void {
-    // Accepted for AkariSub API parity; rassa/wrass currently renders image planes rather than hb-gpu glyph blobs.
-  }
-
-  renderHbGpuBlobs(_glyphData: ArrayBuffer, _atlasData: ArrayBuffer, width: number, height: number): void {
-    this.updateSize(width, height)
-    this.clear()
   }
 
   destroy(): void {

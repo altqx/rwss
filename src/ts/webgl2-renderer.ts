@@ -1,4 +1,4 @@
-import type { AssSubtitleData, HbGpuShaderMessage, RenderImage, WrassPlaneData } from './types'
+import type { AssSubtitleData, RenderImage, WrassPlaneData } from './types'
 import { composeAssFrameCpu, type WrassImageCompositionResult } from './gpu-compositor'
 
 export class WebGL2Renderer {
@@ -70,16 +70,6 @@ export class WebGL2Renderer {
     if (!this.gl) return
     this.gl.clearColor(0, 0, 0, 0)
     this.gl.clear(this.gl.COLOR_BUFFER_BIT)
-  }
-
-  setHbGpuShaders(_shaders: HbGpuShaderMessage | { glsl: HbGpuShaderMessage['glsl'] }): void {
-    // rassa/wrass currently exposes image-composition GPU paths; hb-gpu shader messages are
-    // accepted for AkariSub API parity and ignored until rassa exposes glyph-blob rendering.
-  }
-
-  renderHbGpuBlobs(_glyphData: ArrayBuffer, _atlasData: ArrayBuffer, width: number, height: number): void {
-    this.updateSize(width, height)
-    this.clear()
   }
 
   destroy(): void {

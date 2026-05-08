@@ -34,8 +34,6 @@ export type {
   WrassAvailableFontLoadOptions,
   WrassRegisteredFont,
   WrassResolvedFont,
-  HbGpuShaderMessage,
-  HbGpuRenderMessage,
   WorkerInitMessage,
   WorkerInboundMessage,
   WorkerOutboundMessage

@@ -95,8 +95,6 @@ export type {
   WrassWorkerRequest,
   WrassWorkerResponse,
   WrassRawAesKey,
-  HbGpuShaderMessage,
-  HbGpuRenderMessage,
   WorkerInitMessage,
   WorkerInboundMessage,
   WorkerOutboundMessage
