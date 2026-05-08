@@ -4,6 +4,7 @@
 
 export type {
   AkariSubCompatibleOptions,
+  AkariSubOptions,
   AssCueBounds,
   AssFrameRenderOptions,
   AssMetadata,
@@ -34,7 +35,12 @@ export type {
   WrassFontLoadOptions,
   WrassAvailableFontLoadOptions,
   WrassRegisteredFont,
-  WrassResolvedFont
+  WrassResolvedFont,
+  HbGpuShaderMessage,
+  HbGpuRenderMessage,
+  WorkerInitMessage,
+  WorkerInboundMessage,
+  WorkerOutboundMessage
 } from './types'
 
 export { initWasm, isWasmInitialized, getWasm, getWasmUrl } from './wasm'

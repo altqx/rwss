@@ -59,6 +59,7 @@ export { default } from './wrapper'
 
 export type {
   AkariSubCompatibleOptions,
+  AkariSubOptions,
   AssCueBounds,
   AssFrameRenderOptions,
   AssMetadata,
@@ -95,5 +96,10 @@ export type {
   SerializableWorkerOptions,
   WrassWorkerRequest,
   WrassWorkerResponse,
-  WrassRawAesKey
+  WrassRawAesKey,
+  HbGpuShaderMessage,
+  HbGpuRenderMessage,
+  WorkerInitMessage,
+  WorkerInboundMessage,
+  WorkerOutboundMessage
 } from './wrapper'

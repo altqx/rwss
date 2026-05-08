@@ -1,9 +1,10 @@
-import type { AssSubtitleData, WrassPlaneData } from './types'
+import type { AssSubtitleData, HbGpuShaderMessage, RenderImage, WrassPlaneData } from './types'
 import { composeAssFrameCpu, type WrassImageCompositionResult } from './gpu-compositor'
 
 export class WebGL2Renderer {
   readonly type = 'webgl2' as const
-  private readonly gl: WebGL2RenderingContext | null
+  private _canvas?: HTMLCanvasElement | OffscreenCanvas
+  private gl: WebGL2RenderingContext | null
   private program: WebGLProgram | null = null
   private vao: WebGLVertexArrayObject | null = null
   private buffer: WebGLBuffer | null = null
@@ -11,20 +12,74 @@ export class WebGL2Renderer {
   private texCoordLocation = -1
   private textureLocation: WebGLUniformLocation | null = null
 
-  constructor(readonly canvas?: HTMLCanvasElement | OffscreenCanvas) {
+  constructor(canvas?: HTMLCanvasElement | OffscreenCanvas) {
+    this._canvas = canvas
     this.gl = getWebGL2Context(canvas)
   }
 
-  render(data: AssSubtitleData): WrassImageCompositionResult {
-    if (!this.gl || !this.canvas) {
-      return composeAssFrameCpu(data, 'webgl2', true)
-    }
+  get canvas(): HTMLCanvasElement | OffscreenCanvas | undefined {
+    return this._canvas
+  }
 
+  get initialized(): boolean {
+    return !!this.gl
+  }
+
+  async init(): Promise<void> {
+    if (!this.gl) this.gl = getWebGL2Context(this._canvas)
+    if (!this.gl) throw new Error('WebGL2 not supported')
+  }
+
+  async setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, width: number, height: number): Promise<void> {
+    this._canvas = canvas
+    this.gl = getWebGL2Context(canvas)
+    if (width > 0) canvas.width = width
+    if (height > 0) canvas.height = height
+    if (!this.gl) throw new Error('Failed to create WebGL2 context')
+    this.gl.viewport(0, 0, canvas.width, canvas.height)
+  }
+
+  updateSize(width: number, height: number): void {
+    if (!this._canvas || width <= 0 || height <= 0) return
+    this._canvas.width = width
+    this._canvas.height = height
+    this.gl?.viewport(0, 0, width, height)
+  }
+
+  render(data: AssSubtitleData): WrassImageCompositionResult
+  render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
+  render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): WrassImageCompositionResult | void {
+    if (Array.isArray(dataOrImages)) {
+      this.renderImages(dataOrImages, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
+      return
+    }
+    const data = dataOrImages
     try {
       return this.renderWithWebGL2(data)
     } catch {
       return composeAssFrameCpu(data, 'webgl2', true)
     }
+  }
+
+  renderBitmaps(images: { image: ImageBitmap; x: number; y: number }[], canvasWidth: number, canvasHeight: number): void {
+    const normalized: RenderImage[] = images.map(({ image, x, y }) => ({ x, y, w: image.width, h: image.height, image }))
+    this.renderImages(normalized, canvasWidth, canvasHeight)
+  }
+
+  clear(): void {
+    if (!this.gl) return
+    this.gl.clearColor(0, 0, 0, 0)
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT)
+  }
+
+  setHbGpuShaders(_shaders: HbGpuShaderMessage | { glsl: HbGpuShaderMessage['glsl'] }): void {
+    // rassa/wrass currently exposes image-composition GPU paths; hb-gpu shader messages are
+    // accepted for AkariSub API parity and ignored until rassa exposes glyph-blob rendering.
+  }
+
+  renderHbGpuBlobs(_glyphData: ArrayBuffer, _atlasData: ArrayBuffer, width: number, height: number): void {
+    this.updateSize(width, height)
+    this.clear()
   }
 
   destroy(): void {
@@ -36,6 +91,18 @@ export class WebGL2Renderer {
     this.buffer = null
     this.vao = null
     this.program = null
+  }
+
+  private renderImages(images: RenderImage[], canvasWidth: number, canvasHeight: number): void {
+    if (!this.gl || !this._canvas) return
+    const data: AssSubtitleData = {
+      width: canvasWidth,
+      height: canvasHeight,
+      compositionData: images
+        .filter((image) => image.w > 0 && image.h > 0 && typeof image.image !== 'number')
+        .map(renderImageToPlane)
+    }
+    void this.renderWithWebGL2(data)
   }
 
   private renderWithWebGL2(data: AssSubtitleData): WrassImageCompositionResult {
@@ -152,6 +219,30 @@ void main() {
 export function isWebGL2Supported(): boolean {
   if (typeof document === 'undefined') return false
   return !!document.createElement('canvas').getContext('webgl2')
+}
+
+function renderImageToPlane(image: RenderImage): WrassPlaneData {
+  return {
+    x: image.x,
+    y: image.y,
+    width: image.w,
+    height: image.h,
+    stride: image.w * 4,
+    rgba: isImageBitmapValue(image.image) ? new Uint8Array(image.w * image.h * 4) : renderImageBytes(image.image),
+    color: 0xffffffff,
+    kind: 0
+  }
+}
+
+function isImageBitmapValue(value: RenderImage['image']): value is ImageBitmap {
+  return typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap
+}
+
+function renderImageBytes(value: RenderImage['image']): Uint8Array {
+  if (value instanceof ArrayBuffer) return new Uint8Array(value)
+  if (value instanceof Uint8Array) return value
+  if (value instanceof Uint8ClampedArray) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  return new Uint8Array(0)
 }
 
 function getWebGL2Context(canvas?: HTMLCanvasElement | OffscreenCanvas): WebGL2RenderingContext | null {

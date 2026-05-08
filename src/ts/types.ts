@@ -235,6 +235,109 @@ export interface RenderTimes {
   bitmaps?: number
 }
 
+export type AkariSubOptions = VideoAssSubtitleOptions
+
+export interface HbGpuShaderMessage {
+  target: 'hbGpuShaders'
+  wgsl: {
+    vertex: string
+    fragment: string
+    drawFragment: string
+    paintFragment: string
+  }
+  glsl: {
+    vertex: string
+    fragment: string
+    drawFragment: string
+    paintFragment: string
+  }
+}
+
+export interface HbGpuRenderMessage {
+  target: 'renderHbGpu'
+  glyphData: ArrayBuffer
+  atlasData: ArrayBuffer
+  times: RenderTimes
+  width: number
+  height: number
+  colorSpace: string | null
+}
+
+export type WorkerOutboundMessage =
+  | { target: 'ready' }
+  | { target: 'trackReady' }
+  | { target: 'unbusy' }
+  | { target: 'console'; command: string; content: string }
+  | { target: 'getLocalFont'; font: string }
+  | { target: 'verifyColorSpace'; subtitleColorSpace: string | null }
+  | { target: 'getEvents'; events: ASSEvent[] }
+  | { target: 'getStyles'; styles: ASSStyle[]; time: number }
+  | { target: 'getStats'; stats: Partial<PerformanceStats> }
+  | { target: 'resetStats'; success: boolean }
+  | { target: 'getEventCount'; count: number }
+  | { target: 'getStyleCount'; count: number }
+  | HbGpuShaderMessage
+  | HbGpuRenderMessage
+  | { target: 'render'; images: RenderImage[]; times: RenderTimes; width: number; height: number; colorSpace: string | null }
+
+export interface WorkerInitMessage {
+  target: 'init'
+  wasmUrl: string
+  asyncRender: boolean
+  fullTrackWarmup: boolean
+  onDemandRender: boolean
+  initialTime: number
+  width: number
+  height: number
+  blendMode: WrassBlendMode
+  subUrl?: string
+  subContent?: string | Uint8Array | ArrayBuffer | null
+  encryptedSubContent?: EncryptedSubtitleContent | null
+  fonts: (string | Uint8Array)[]
+  availableFonts: Record<string, string | Uint8Array>
+  fallbackFonts: string[]
+  debug: boolean
+  targetFps: number
+  dropAllAnimations?: boolean
+  dropAllBlur?: boolean
+  clampPos?: boolean
+  libassMemoryLimit?: number
+  libassGlyphLimit?: number
+  useLocalFonts: boolean
+  hasBitmapBug: boolean
+}
+
+export type WorkerInboundMessage =
+  | WorkerInitMessage
+  | { target: 'offscreenCanvas'; transferable: [OffscreenCanvas] }
+  | { target: 'detachOffscreen' }
+  | { target: 'canvas'; width: number; height: number; videoWidth: number; videoHeight: number; force?: boolean }
+  | { target: 'video'; currentTime?: number; isPaused?: boolean; rate?: number; colorSpace?: string | null }
+  | { target: 'setTrack'; content: string | Uint8Array | ArrayBuffer }
+  | { target: 'setEncryptedTrack'; content: EncryptedSubtitleContent }
+  | { target: 'setTrackByUrl'; url: string }
+  | { target: 'freeTrack' }
+  | { target: 'demand'; time: number }
+  | { target: 'destroy' }
+  | { target: 'addFont'; font: string | Uint8Array }
+  | { target: 'defaultFont'; font: string }
+  | { target: 'createEvent'; event: Partial<ASSEvent> }
+  | { target: 'setEvent'; event: Partial<ASSEvent>; index: number }
+  | { target: 'removeEvent'; index: number }
+  | { target: 'getEvents' }
+  | { target: 'createStyle'; style: Partial<ASSStyle> }
+  | { target: 'setStyle'; style: Partial<ASSStyle>; index: number }
+  | { target: 'removeStyle'; index: number }
+  | { target: 'getStyles' }
+  | { target: 'styleOverride'; style: Partial<ASSStyle> }
+  | { target: 'disableStyleOverride' }
+  | { target: 'getStats' }
+  | { target: 'resetStats' }
+  | { target: 'getEventCount' }
+  | { target: 'getStyleCount' }
+  | { target: 'runBenchmark' }
+  | { target: 'getColorSpace' }
+
 export type ASSEventCallback = (error: Error | null, events: ASSEvent[]) => void
 export type ASSStyleCallback = (error: Error | null, styles: ASSStyle[]) => void
 export type PerformanceStatsCallback = (error: Error | null, stats: PerformanceStats | null) => void

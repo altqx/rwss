@@ -1,4 +1,4 @@
-import type { AssSubtitleData, WrassPlaneData } from './types'
+import type { AssSubtitleData, HbGpuShaderMessage, RenderImage, WrassPlaneData } from './types'
 import { composeAssFrameCpu, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
 
 export interface WebGPURendererOptions {
@@ -20,11 +20,21 @@ export class WebGPURenderer {
   private format: GPUTextureFormat
   private pipelineState: WebGPUPipelineState | null = null
   private initPromise: Promise<boolean> | null = null
+  private _canvas?: HTMLCanvasElement | OffscreenCanvas
 
-  constructor(readonly canvas?: HTMLCanvasElement | OffscreenCanvas, options: WebGPURendererOptions = {}) {
+  constructor(canvas?: HTMLCanvasElement | OffscreenCanvas, options: WebGPURendererOptions = {}) {
+    this._canvas = canvas
     this.device = options.device ?? null
     this.context = options.context ?? getWebGPUContext(canvas)
     this.format = options.format ?? getPreferredCanvasFormat()
+  }
+
+  get canvas(): HTMLCanvasElement | OffscreenCanvas | undefined {
+    return this._canvas
+  }
+
+  get initialized(): boolean {
+    return !!this.device
   }
 
   static async create(canvas?: HTMLCanvasElement | OffscreenCanvas, options: WebGPURendererOptions = {}): Promise<WebGPURenderer> {
@@ -43,7 +53,14 @@ export class WebGPURenderer {
     return this.initPromise
   }
 
-  render(data: AssSubtitleData): WrassImageCompositionResult {
+  render(data: AssSubtitleData): WrassImageCompositionResult
+  render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
+  render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): WrassImageCompositionResult | void {
+    if (Array.isArray(dataOrImages)) {
+      void this.renderImages(dataOrImages, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
+      return
+    }
+    const data = dataOrImages
     // WebGPU readback is asynchronous (`GPUBuffer.mapAsync`), so the sync render contract remains
     // a deterministic CPU fallback. Use `await renderAsync(data)` for the real WebGPU compositor.
     const result = composeAssFrameCpu(data, 'webgpu', true)
@@ -61,11 +78,59 @@ export class WebGPURenderer {
     }
   }
 
+  async setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, width: number, height: number): Promise<void> {
+    this._canvas = canvas
+    this.context = getWebGPUContext(canvas)
+    if (width > 0) canvas.width = width
+    if (height > 0) canvas.height = height
+    if (await this.init()) this.configureContext()
+  }
+
+  updateSize(width: number, height: number): void {
+    if (!this._canvas || width <= 0 || height <= 0) return
+    this._canvas.width = width
+    this._canvas.height = height
+  }
+
+  renderBitmaps(images: { image: ImageBitmap; x: number; y: number }[], canvasWidth: number, canvasHeight: number): void {
+    const normalized: RenderImage[] = images.map(({ image, x, y }) => ({ x, y, w: image.width, h: image.height, image }))
+    void this.renderImages(normalized, canvasWidth, canvasHeight)
+  }
+
+  clear(): void {
+    if (!this.device || !this.context) return
+    const texture = this.context.getCurrentTexture()
+    const encoder = this.device.createCommandEncoder()
+    const pass = encoder.beginRenderPass({ colorAttachments: [{ view: texture.createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] })
+    pass.end()
+    this.device.queue.submit([encoder.finish()])
+  }
+
+  setHbGpuShaders(_shaders: HbGpuShaderMessage | { wgsl: HbGpuShaderMessage['wgsl'] }): void {
+    // Accepted for AkariSub API parity; rassa/wrass currently renders image planes rather than hb-gpu glyph blobs.
+  }
+
+  renderHbGpuBlobs(_glyphData: ArrayBuffer, _atlasData: ArrayBuffer, width: number, height: number): void {
+    this.updateSize(width, height)
+    this.clear()
+  }
+
   destroy(): void {
     this.pipelineState?.vertexBuffer.destroy()
     this.pipelineState = null
     this.device = null
     this.context = null
+  }
+
+  private async renderImages(images: RenderImage[], canvasWidth: number, canvasHeight: number): Promise<void> {
+    const data: AssSubtitleData = {
+      width: canvasWidth,
+      height: canvasHeight,
+      compositionData: images
+        .filter((image) => image.w > 0 && image.h > 0 && typeof image.image !== 'number')
+        .map(renderImageToPlane)
+    }
+    if (await this.init()) await this.renderWithWebGPU(data)
   }
 
   private async initDevice(): Promise<boolean> {
@@ -74,7 +139,7 @@ export class WebGPURenderer {
     const adapter = await gpu.requestAdapter()
     if (!adapter) return false
     this.device = await adapter.requestDevice()
-    this.context = this.context ?? getWebGPUContext(this.canvas)
+    this.context = this.context ?? getWebGPUContext(this._canvas)
     this.configureContext()
     return true
   }
@@ -247,6 +312,30 @@ fn fs_main(in: VertexOut) -> @location(0) vec4f {
 
 export function isWebGPUSupported(): boolean {
   return !!getNavigatorGpu()
+}
+
+function renderImageToPlane(image: RenderImage): WrassPlaneData {
+  return {
+    x: image.x,
+    y: image.y,
+    width: image.w,
+    height: image.h,
+    stride: image.w * 4,
+    rgba: isImageBitmapValue(image.image) ? new Uint8Array(image.w * image.h * 4) : renderImageBytes(image.image),
+    color: 0xffffffff,
+    kind: 0
+  }
+}
+
+function isImageBitmapValue(value: RenderImage['image']): value is ImageBitmap {
+  return typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap
+}
+
+function renderImageBytes(value: RenderImage['image']): Uint8Array {
+  if (value instanceof ArrayBuffer) return new Uint8Array(value)
+  if (value instanceof Uint8Array) return value
+  if (value instanceof Uint8ClampedArray) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  return new Uint8Array(0)
 }
 
 function getNavigatorGpu(): GPU | null {
