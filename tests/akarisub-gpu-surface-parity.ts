@@ -11,7 +11,6 @@ import {
 const canvas = document.createElement('canvas')
 const options: VideoAssSubtitleOptions = {
   canvas,
-  blendMode: 'wasm',
   workerUrl: '/akarisub-worker.js',
   wasmUrl: '/akarisub-worker.wasm',
   renderAhead: 0.008,
@@ -36,7 +35,6 @@ const initMessage: WorkerInitMessage = {
   initialTime: 0,
   width: 1,
   height: 1,
-  blendMode: 'wasm',
   subContent: null,
   encryptedSubContent: null,
   fonts: [],

@@ -29,6 +29,7 @@ export class AssRenderer {
   private options: VideoAssSubtitleOptions
   private opened?: AssParser
   private raf = 0
+  private videoFrameCallback = 0
   private destroyed = false
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
@@ -91,7 +92,20 @@ export class AssRenderer {
   }
 
   start(): void {
-    if (this.destroyed || this.raf) return
+    if (this.destroyed || this.raf || this.videoFrameCallback) return
+    if (this.options.video) {
+      const tick: VideoFrameRequestCallback = () => {
+        if (this.destroyed || !this.options.video) {
+          this.videoFrameCallback = 0
+          return
+        }
+        this.renderCurrentTime()
+        this.videoFrameCallback = this.options.video.requestVideoFrameCallback(tick)
+      }
+      this.videoFrameCallback = this.options.video.requestVideoFrameCallback(tick)
+      return
+    }
+
     const interval = 1000 / Math.max(1, this.options.targetFps ?? 24)
     let lastTick = 0
     const tick = (now: number) => {
@@ -105,7 +119,9 @@ export class AssRenderer {
 
   stop(): void {
     if (this.raf) cancelAnimationFrame(this.raf)
+    if (this.videoFrameCallback && this.options.video) this.options.video.cancelVideoFrameCallback(this.videoFrameCallback)
     this.raf = 0
+    this.videoFrameCallback = 0
   }
 
   resize(width?: number, height?: number): void {

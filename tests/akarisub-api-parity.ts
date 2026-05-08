@@ -34,7 +34,6 @@ const stylePatch: Partial<ASSStyle> = { Name: 'Default', FontName: 'sans', FontS
 const options: VideoAssSubtitleOptions = {
   video,
   canvas,
-  blendMode: 'js',
   asyncRender: true,
   offscreenRender: true,
   onDemandRender: true,

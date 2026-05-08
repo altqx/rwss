@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { WebGL2Renderer } from '../src/ts/webgl2-renderer'
 import { WebGPURenderer } from '../src/ts/webgpu-renderer'
+import { AssRenderer } from '../src/ts/renderers'
 import type { AssSubtitleData } from '../src/ts/types'
 
 const frame: AssSubtitleData = {
@@ -48,5 +49,37 @@ describe('AkariSub-compatible GPU renderer composition surfaces', () => {
     expect(result.compositionCount).toBe(1)
     expect(result.nonTransparentPixels).toBe(2)
     expect(result.alphaSum).toBe(383)
+  })
+})
+
+describe('modern browser scheduling', () => {
+  test('video render loop uses requestVideoFrameCallback instead of timer throttling', () => {
+    let callback: VideoFrameRequestCallback | undefined
+    let cancelled = 0
+    const video = {
+      currentTime: 0,
+      videoWidth: 16,
+      videoHeight: 9,
+      getBoundingClientRect: () => ({ width: 16, height: 9 }),
+      requestVideoFrameCallback: (cb: VideoFrameRequestCallback) => {
+        callback = cb
+        return 42
+      },
+      cancelVideoFrameCallback: (handle: number) => {
+        cancelled = handle
+      }
+    } as unknown as HTMLVideoElement
+    const canvas = {
+      width: 16,
+      height: 9,
+      getContext: () => ({ clearRect() {}, drawImage() {} })
+    } as unknown as HTMLCanvasElement
+
+    const renderer = new AssRenderer({ video, canvas, subContent: '[Script Info]\n', autoLoad: false })
+    renderer.start()
+    expect(callback).toBeFunction()
+    renderer.stop()
+    expect(cancelled).toBe(42)
+    renderer.destroy()
   })
 })

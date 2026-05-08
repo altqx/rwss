@@ -1,7 +1,6 @@
 export type AssSubtitleFormatName = 'ass'
 export type WrassRendererBackend = 'canvas2d' | 'webgl2' | 'webgpu'
 export type WrassFrameCropMode = 'screen' | 'bounds'
-export type WrassBlendMode = 'js' | 'wasm'
 
 export interface AssMetadata {
   format: AssSubtitleFormatName
@@ -157,7 +156,6 @@ export interface WrassResolvedFont {
 export interface VideoAssSubtitleOptions {
   video?: HTMLVideoElement
   canvas?: HTMLCanvasElement
-  blendMode?: WrassBlendMode
   asyncRender?: boolean
   offscreenRender?: boolean
   onDemandRender?: boolean
@@ -257,7 +255,6 @@ export interface WorkerInitMessage {
   initialTime: number
   width: number
   height: number
-  blendMode: WrassBlendMode
   subUrl?: string
   subContent?: string | Uint8Array | ArrayBuffer | null
   encryptedSubContent?: EncryptedSubtitleContent | null

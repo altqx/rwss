@@ -78,7 +78,6 @@ export type {
   SubtitleColorSpace,
   VideoAssSubtitleOptions,
   WebYCbCrColorSpace,
-  WrassBlendMode,
   WrassFrameCropMode,
   WrassPlaneData,
   WrassRendererBackend,
