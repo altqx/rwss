@@ -34,13 +34,13 @@ AkariSub is used as the browser API/feature oracle. The current wrass scaffold m
 - video/canvas integrated renderer (`AssRenderer`)
 - options for `subUrl`, `subContent`, `wasmUrl`, `fonts`, `availableFonts`, `fallbackFonts`, `timeOffset`, `debug`, and callbacks
 
-Planned parity work:
+Implemented follow-up parity surfaces:
 
-- worker/offscreen rendering equivalent to AkariSub
-- browser-provided font loading routed into rassa without relying on host Fontconfig
-- WebGPU/WebGL2 image composition path
-- AkariSub-compatible performance stats and detailed render events
-- encrypted subtitle content transport if the project needs akari-crypto parity
+- worker/offscreen client/runtime protocol (`AssRendererWorkerClient`, `worker-runtime.ts`) for OffscreenCanvas rendering handoff
+- browser-provided font loading routed into rassa's virtual font registry via `fonts`, `availableFonts`, `queryLocalFonts`, and fallback family aliases
+- WebGPU/WebGL2 image composition facade with deterministic CPU fallback for unsupported/headless runtimes
+- AkariSub-compatible performance stats plus detailed render events (`renderTime`, bounds, backend, dropped flag)
+- AES-GCM encrypted subtitle content transport with IV-prefixed chunks and raw-key helpers for akari-crypto style handoff
 
 ## Development
 

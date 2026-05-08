@@ -8,6 +8,7 @@ import type {
   WrassFontSource
 } from './types'
 import { openAss, type AssParser } from './parsers'
+import { decryptSubtitleContent } from './crypto'
 import {
   DEFAULT_AVAILABLE_FONTS,
   DEFAULT_FALLBACK_FONTS,
@@ -65,7 +66,7 @@ export class AssRenderer {
     if (!ctx) throw new Error('Canvas rendering not supported')
     this.ctx = ctx
     this.options.onCanvasFallback?.()
-    void this.load()
+    if (this.options.autoLoad !== false) void this.load()
   }
 
   get rendererType(): 'canvas2d' {
@@ -269,8 +270,8 @@ export class AssRenderer {
       cacheHits: 0,
       cacheMisses: 0,
       renderFps: avgRenderTime > 0 ? Math.round(1000 / avgRenderTime) : 0,
-      usingWorker: false,
-      offscreenRender: false,
+      usingWorker: !!this.options.workerUrl,
+      offscreenRender: !!this.options.offscreenRender,
       onDemandRender: this.options.onDemandRender !== false
     }
   }
@@ -289,8 +290,8 @@ export class AssRenderer {
       cacheHits: 0,
       cacheMisses: 0,
       renderFps: avgRenderTime > 0 ? Math.round(1000 / avgRenderTime) : 0,
-      usingWorker: false,
-      offscreenRender: false,
+      usingWorker: !!this.options.workerUrl,
+      offscreenRender: !!this.options.offscreenRender,
       onDemandRender: this.options.onDemandRender !== false,
       backend: 'canvas2d'
     }
@@ -332,7 +333,8 @@ export class AssRenderer {
     if (frame) {
       const bitmapCanvas = toCanvas(frame) as HTMLCanvasElement
       this.ctx.drawImage(bitmapCanvas, 0, 0, this.canvas.width, this.canvas.height)
-      this.options.onEvent?.({ type: 'render', time, compositionCount: frame.compositionCount })
+      const renderTime = performance.now() - started
+      this.options.onEvent?.({ type: 'render', time, compositionCount: frame.compositionCount, renderTime, bounds: frame.bounds, backend: this.rendererType, dropped: false })
     }
     this.recordRenderTime(performance.now() - started)
   }
@@ -486,28 +488,6 @@ function decodeSubtitleBytes(content: string | Uint8Array | ArrayBuffer): string
   if (typeof content === 'string') return content
   if (content instanceof ArrayBuffer) return new TextDecoder().decode(content)
   return new TextDecoder().decode(content)
-}
-
-async function decryptSubtitleContent(content: EncryptedSubtitleContent): Promise<string> {
-  const chunks = content.encryptedChunks ?? (content.encrypted ? [content.encrypted] : [])
-  if (chunks.length === 0) throw new Error('Encrypted subtitle content is empty')
-  const parts: Uint8Array[] = []
-  for (const chunk of chunks) {
-    const bytes = new Uint8Array(chunk)
-    if (bytes.byteLength < 13) throw new Error('Encrypted subtitle payload must be IV-prefixed AES-GCM data')
-    const iv = bytes.slice(0, 12)
-    const ciphertext = bytes.slice(12)
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, content.contentKey, ciphertext)
-    parts.push(new Uint8Array(plain))
-  }
-  const total = parts.reduce((sum, part) => sum + part.byteLength, 0)
-  const joined = new Uint8Array(total)
-  let offset = 0
-  for (const part of parts) {
-    joined.set(part, offset)
-    offset += part.byteLength
-  }
-  return new TextDecoder().decode(joined)
 }
 
 function normalizeEvent(event: Partial<ASSEvent>, readOrder: number): ASSEvent {

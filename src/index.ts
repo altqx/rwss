@@ -46,7 +46,14 @@ export {
   WebGPURenderer,
   isWebGPUSupported,
   WebGL2Renderer,
-  isWebGL2Supported
+  isWebGL2Supported,
+  composeAssFrameCpu,
+  putCompositionOnCanvas,
+  AssRendererWorkerClient,
+  createAssRendererWorkerClient,
+  createEncryptedSubtitleContent,
+  decryptSubtitleContent,
+  importAesGcmKey
 } from './wrapper'
 export { default } from './wrapper'
 
@@ -82,5 +89,11 @@ export type {
   WrassFontLoadOptions,
   WrassAvailableFontLoadOptions,
   WrassRegisteredFont,
-  WrassResolvedFont
+  WrassResolvedFont,
+  WrassImageCompositionResult,
+  AssRendererWorkerClientOptions,
+  SerializableWorkerOptions,
+  WrassWorkerRequest,
+  WrassWorkerResponse,
+  WrassRawAesKey
 } from './wrapper'

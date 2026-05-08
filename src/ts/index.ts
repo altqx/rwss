@@ -52,6 +52,16 @@ export {
 } from './wasm'
 export { imageDataFromBytes, planeToImageData, renderFrameData, toBlob, toCanvas, toImageBitmap }
   from './wasm'
+export { composeAssFrameCpu, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
+export { createEncryptedSubtitleContent, decryptSubtitleContent, importAesGcmKey, type WrassRawAesKey } from './crypto'
+export {
+  AssRendererWorkerClient,
+  createAssRendererWorkerClient,
+  type AssRendererWorkerClientOptions,
+  type SerializableWorkerOptions,
+  type WrassWorkerRequest,
+  type WrassWorkerResponse
+} from './worker-client'
 export { AssParser, detectSubtitleFormat, normalizeError, openAss } from './parsers'
 export { AssRenderer, AssRenderer as AkariSub, createAssRenderer }
   from './renderers'

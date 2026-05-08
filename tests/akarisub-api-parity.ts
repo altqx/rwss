@@ -3,6 +3,7 @@ import DefaultExport, {
   AssRenderer,
   WebGPURenderer,
   WebGL2Renderer,
+  type WrassImageCompositionResult,
   registerFont,
   registerFontBytes,
   registerAvailableFonts,
@@ -122,8 +123,10 @@ void directFontPath
 void registeredPathsPromise
 void rendererFromAlias
 void rendererFromDefault
-void new WebGPURenderer(canvas)
-void new WebGL2Renderer(canvas)
+const gpuComposition: WrassImageCompositionResult = new WebGPURenderer(canvas).render({ width: 1, height: 1, compositionData: [] })
+const glComposition: WrassImageCompositionResult = new WebGL2Renderer(canvas).render({ width: 1, height: 1, compositionData: [] })
+void gpuComposition
+void glComposition
 void computeCanvasSize(video)
 void dropBlur('{\\blur5}x')
 void fixPlayRes('[Script Info]\n')

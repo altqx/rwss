@@ -1,5 +1,5 @@
 export type AssSubtitleFormatName = 'ass'
-export type WrassRendererBackend = 'canvas2d'
+export type WrassRendererBackend = 'canvas2d' | 'webgl2' | 'webgpu'
 export type WrassFrameCropMode = 'screen' | 'bounds'
 export type WrassBlendMode = 'js' | 'wasm' | 'hb-gpu'
 
@@ -61,8 +61,8 @@ export interface ASSStyle {
 }
 
 export interface EncryptedSubtitleContent {
-  /** Non-extractable AES-GCM content key. wrass expects IV-prefixed payloads: 12-byte IV + ciphertext. */
-  contentKey: CryptoKey
+  /** AES-GCM content key. Raw 128/192/256-bit key bytes are accepted for akari-crypto style handoff. */
+  contentKey: CryptoKey | Uint8Array | ArrayBuffer | ArrayBufferView
   encrypted?: ArrayBuffer
   encryptedChunks?: ArrayBuffer[]
 }
@@ -188,6 +188,8 @@ export interface VideoAssSubtitleOptions {
   onEvent?: (event: WrassRendererEvent) => void
   renderAhead?: number
   fullTrackWarmup?: boolean
+  /** Internal/advanced: set false when a worker runtime wants to await load() explicitly. */
+  autoLoad?: boolean
 }
 
 export type AkariSubCompatibleOptions = VideoAssSubtitleOptions
@@ -242,6 +244,6 @@ export type WrassRendererEvent =
   | { type: 'load-start' }
   | { type: 'load-complete'; metadata: AssMetadata }
   | { type: 'track-ready'; metadata: AssMetadata }
-  | { type: 'render'; time: number; compositionCount: number }
+  | { type: 'render'; time: number; compositionCount: number; renderTime: number; bounds: AssCueBounds | null; backend: WrassRendererBackend; dropped: boolean }
   | { type: 'message'; target: string; data?: unknown }
   | { type: 'error'; error: Error }

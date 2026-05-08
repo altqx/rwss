@@ -29,8 +29,9 @@
     "build": "bun run build:wasm:release && bun run build:ts",
     "typecheck": "bun x tsc -p tsconfig.json --pretty false && bun x tsc -p tsconfig.test.json --noEmit --pretty false",
     "test:rust": "cargo test",
+    "test:ts": "bun test tests/*.test.ts",
     "test:e2e": "bun test tests/e2e-render.test.ts",
-    "test": "bun run test:rust && bun run typecheck && bun run test:e2e",
+    "test": "bun run test:rust && bun run typecheck && bun run test:ts",
     "clean": "rm -rf pkg pkg-bundler dist target tests/artifacts",
     "format": "cargo fmt"
   },
