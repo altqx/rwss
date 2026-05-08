@@ -19,16 +19,28 @@ export const DEFAULT_AVAILABLE_FONTS: Record<string, string | Uint8Array | Array
 }
 
 let wasmModule: WasmModule | null = null
-let wasmUrl: string | URL | Request | undefined
+let wasmInitPromise: Promise<WasmModule> | null = null
+let wasmUrl: string | URL | Request = getDefaultWasmUrl()
 
 export async function initWasm(input?: string | URL | Request): Promise<WasmModule> {
   if (wasmModule) return wasmModule
-  wasmUrl = input
-  const mod = await import('../../pkg/wrass')
-  const init = (mod as unknown as { default?: (input?: string | URL | Request) => Promise<unknown> }).default
-  if (init) await init(input)
-  wasmModule = mod
-  return mod
+  if (wasmInitPromise) return wasmInitPromise
+
+  const selectedWasmUrl = input ?? getDefaultWasmUrl()
+  wasmUrl = selectedWasmUrl
+  wasmInitPromise = (async () => {
+    try {
+      const mod = await import('../../pkg/wrass')
+      const init = (mod as unknown as { default?: (input?: { module_or_path: string | URL | Request } | string | URL | Request) => Promise<unknown> }).default
+      if (init) await (input === undefined ? init() : init({ module_or_path: selectedWasmUrl }))
+      wasmModule = mod
+      return mod
+    } catch (error) {
+      wasmInitPromise = null
+      throw error
+    }
+  })()
+  return wasmInitPromise
 }
 
 export function isWasmInitialized(): boolean {
@@ -42,8 +54,25 @@ export function getWasm(): WasmModule {
   return wasmModule
 }
 
-export function getWasmUrl(): string | URL | Request | undefined {
+export function getWasmUrl(): string | URL | Request {
   return wasmUrl
+}
+
+function getDefaultWasmUrl(): string {
+  try {
+    return new URL('../../pkg/wrass_bg.wasm', import.meta.url).href
+  } catch {
+    if (typeof window !== 'undefined') {
+      return new URL('/wrass/wrass_bg.wasm', window.location.origin).href
+    }
+    return '/wrass/wrass_bg.wasm'
+  }
+}
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    initWasm().catch((error) => console.warn('[wrass] WASM pre-init failed:', error))
+  }, 100)
 }
 
 export async function registerFont(font: WrassFontSource | string, data?: Uint8Array | ArrayBuffer | ArrayBufferView, options?: WrassFontLoadOptions): Promise<string | undefined> {
