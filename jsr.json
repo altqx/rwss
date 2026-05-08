@@ -1,0 +1,8 @@
+{
+  "name": "wrass",
+  "version": "0.1.0",
+  "exports": "./dist/index.js",
+  "publish": {
+    "include": ["dist", "pkg", "src/wrapper.ts", "README.md", "LICENSE", "Cargo.toml"]
+  }
+}

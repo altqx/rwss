@@ -1,0 +1,8 @@
+target/
+pkg/
+pkg-bundler/
+dist/
+node_modules/
+tests/artifacts/
+.DS_Store
+*.log

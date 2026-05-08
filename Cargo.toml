@@ -1,0 +1,41 @@
+[package]
+name = "wrass"
+version = "0.1.0"
+edition = "2024"
+authors = ["altqx"]
+license = "MIT"
+description = "Web browser ASS/SSA renderer wrapper around the pure-Rust rassa renderer"
+repository = "https://github.com/altqx/wrass"
+keywords = ["ass", "ssa", "subtitle", "wasm", "rassa"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+rassa = "0.4.0"
+rassa-fonts = "0.4.0"
+rassa-shape = "0.4.0"
+ttf-parser = "0.25"
+wasm-bindgen = "0.2.118"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+[patch.crates-io]
+rassa-shape = { path = "vendor/rassa-shape" }
+rassa-raster = { path = "vendor/rassa-raster" }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.68"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O4", "--enable-simd"]
