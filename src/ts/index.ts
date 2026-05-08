@@ -82,5 +82,5 @@ export {
   testImageBugs,
   webYCbCrMap
 } from './utils'
-export { WebGPURenderer, isWebGPUSupported } from './webgpu-renderer'
+export { WebGPURenderer, isWebGPUSupported, type WebGPURendererOptions } from './webgpu-renderer'
 export { WebGL2Renderer, isWebGL2Supported } from './webgl2-renderer'
