@@ -38,7 +38,8 @@ Implemented follow-up parity surfaces:
 
 - worker/offscreen client/runtime protocol (`AssRendererWorkerClient`, `worker-runtime.ts`) for OffscreenCanvas rendering handoff
 - browser-provided font loading routed into rassa's virtual font registry via `fonts`, `availableFonts`, `queryLocalFonts`, and fallback family aliases
-- WebGPU/WebGL2 image composition facade with deterministic CPU fallback for unsupported/headless runtimes
+- WebGL2 image composition pipeline that uploads ASS planes as RGBA textures, draws textured quads with source-over alpha blending, and reads back top-left RGBA; unsupported/headless runtimes still use deterministic CPU fallback
+- WebGPU image composition facade with deterministic CPU fallback for unsupported/headless runtimes
 - AkariSub-compatible performance stats plus detailed render events (`renderTime`, bounds, backend, dropped flag)
 - AES-GCM encrypted subtitle content transport with IV-prefixed chunks and raw-key helpers for akari-crypto style handoff
 
