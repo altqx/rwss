@@ -3,8 +3,6 @@
  */
 
 export type {
-  AkariSubCompatibleOptions,
-  AkariSubOptions,
   AssCueBounds,
   AssFrameRenderOptions,
   AssMetadata,

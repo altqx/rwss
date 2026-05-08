@@ -18,7 +18,7 @@ import DefaultExport, {
   fixPlayRes,
   parseAss,
   runFeatureTests,
-  type AkariSubCompatibleOptions,
+  type VideoAssSubtitleOptions,
   type ASSEvent,
   type ASSStyle,
   type EncryptedSubtitleContent,
@@ -31,7 +31,7 @@ const encrypted = {} as EncryptedSubtitleContent
 const eventPatch: Partial<ASSEvent> = { Text: 'hello', Start: 0, Duration: 1 }
 const stylePatch: Partial<ASSStyle> = { Name: 'Default', FontName: 'sans', FontSize: 24 }
 
-const options: AkariSubCompatibleOptions = {
+const options: VideoAssSubtitleOptions = {
   video,
   canvas,
   blendMode: 'js',

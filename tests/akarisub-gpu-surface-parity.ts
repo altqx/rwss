@@ -1,7 +1,7 @@
 import {
   WebGPURenderer,
   WebGL2Renderer,
-  type AkariSubOptions,
+  type VideoAssSubtitleOptions,
   type WorkerInboundMessage,
   type WorkerOutboundMessage,
   type WorkerInitMessage,
@@ -11,7 +11,7 @@ import {
 } from '../src/index'
 
 const canvas = document.createElement('canvas')
-const options: AkariSubOptions = {
+const options: VideoAssSubtitleOptions = {
   canvas,
   blendMode: 'hb-gpu',
   workerUrl: '/akarisub-worker.js',

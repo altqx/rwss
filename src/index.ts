@@ -58,8 +58,6 @@ export {
 export { default } from './wrapper'
 
 export type {
-  AkariSubCompatibleOptions,
-  AkariSubOptions,
   AssCueBounds,
   AssFrameRenderOptions,
   AssMetadata,

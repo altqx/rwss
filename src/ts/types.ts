@@ -192,8 +192,6 @@ export interface VideoAssSubtitleOptions {
   autoLoad?: boolean
 }
 
-export type AkariSubCompatibleOptions = VideoAssSubtitleOptions
-
 export interface PerformanceStats {
   framesRendered: number
   framesDropped: number
@@ -234,8 +232,6 @@ export interface RenderTimes {
   IPCTime?: number
   bitmaps?: number
 }
-
-export type AkariSubOptions = VideoAssSubtitleOptions
 
 export interface HbGpuShaderMessage {
   target: 'hbGpuShaders'
