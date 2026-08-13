@@ -15,9 +15,9 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-rassa = "0.6.0"
-rassa-fonts = "0.6.0"
-rassa-shape = "0.6.0"
+rassa = "0.7.0"
+rassa-fonts = "0.7.0"
+rassa-shape = "0.7.0"
 ttf-parser = "0.25"
 wasm-bindgen = "0.2.127"
 serde = { version = "1.0", features = ["derive"] }
