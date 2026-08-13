@@ -65,6 +65,7 @@ const isLikelyWebKit = (): boolean => {
   return vendor.includes('Apple')
 }
 
+/** High-level video/canvas ASS renderer with RVFC sync and GPU fallback. */
 export class AssRenderer extends EventTarget {
   private options: VideoAssSubtitleOptions
   private opened?: AssParser
@@ -117,15 +118,24 @@ export class AssRenderer extends EventTarget {
   private readonly onDemandRender: boolean
   private readonly isLikelyWebKit: boolean
 
+  /** Seconds added to media time before sampling ASS. */
   public timeOffset: number
+  /** When true, emit extra renderer debug logs. */
   public debug: boolean
+  /** Extra scale applied before the height cap. */
   public prescaleFactor: number
+  /** Height limit used when applying prescaleFactor. */
   public prescaleHeightLimit: number
+  /** Hard cap on overlay backing-store height. */
   public maxRenderHeight: number
+  /** Whether a render is currently in flight. */
   public busy = false
+  /** Extra seconds of render-ahead lead. */
   public renderAhead: number
+  /** Exact-frame prefetch runway (0–24). */
   public framePrefetch: number
 
+  /** Create a video or canvas ASS renderer. */
   constructor(options: VideoAssSubtitleOptions) {
     super()
     if (!options) throw new Error('No options provided')
@@ -176,10 +186,12 @@ export class AssRenderer extends EventTarget {
     if (this.options.autoLoad !== false) void this.load()
   }
 
+  /** Active presentation backend. */
   get rendererType(): RwssRendererBackend {
     return this.backend
   }
 
+  /** Whether WebGPU or WebGL2 is presenting the overlay. */
   get isUsingGPURenderer(): boolean {
     return this.gpuRenderer !== null && this.backend !== 'canvas2d'
   }
@@ -189,6 +201,7 @@ export class AssRenderer extends EventTarget {
     return this.backend === 'webgpu'
   }
 
+  /** Load the configured subtitle input and start the render loop. */
   async load(): Promise<void> {
     this.options.onLoading?.()
     this.emitEvent({ type: 'load-start' })
@@ -207,6 +220,7 @@ export class AssRenderer extends EventTarget {
     }
   }
 
+  /** Start the RVFC or animation-frame render loop. */
   start(): void {
     if (this.destroyed || this.raf || this.videoFrameCallback) return
     if (this.options.video && this.onDemandRender && typeof this.options.video.requestVideoFrameCallback === 'function') {
@@ -225,6 +239,7 @@ export class AssRenderer extends EventTarget {
     this.raf = requestAnimationFrame(tick)
   }
 
+  /** Stop the render loop without disposing the renderer. */
   stop(): void {
     this.rvfcGeneration++
     if (this.raf) cancelAnimationFrame(this.raf)
@@ -239,11 +254,13 @@ export class AssRenderer extends EventTarget {
     this.videoFrameCallback = 0
   }
 
-  resize(width?: number, height?: number, top = 0, left = 0, force = this.isVideoPaused()): void {
+  /** Resize the overlay canvas and optionally redraw immediately. */
+  resize(width?: number, height?: number, top = 0, left = 0, force: boolean = this.isVideoPaused()): void {
     this.layoutCanvas(width, height, top, left)
     if (force && this.opened) this.renderCurrentTime(true)
   }
 
+  /** Bind a different video element and resubscribe clock listeners. */
   setVideo(video: HTMLVideoElement): void {
     this.removeVideoListeners()
     this.options.video = video
@@ -265,6 +282,7 @@ export class AssRenderer extends EventTarget {
     this.syncVideoClock()
   }
 
+  /** Replace or clear the encoded-frame timeline used for exact sampling. */
   setFrameTimeline(frameTimes: FrameTimeline | null): void {
     this.frameTimeline = frameTimes ? normalizeFrameTimeline(frameTimes) : null
     this.options.frameTimeline = frameTimes ?? undefined
@@ -274,12 +292,14 @@ export class AssRenderer extends EventTarget {
     void this.dispatchNextPreparation()
   }
 
+  /** Emit a simple render-timing debug message. */
   runBenchmark(): void {
     const start = performance.now()
     this.renderCurrentTime(true)
     this.emitEvent({ type: 'message', target: 'runBenchmark', data: { elapsed: performance.now() - start } })
   }
 
+  /** Replace the current track by fetching a URL. */
   setTrackByUrl(url: string): void {
     this.options.subUrl = url
     this.options.subContent = undefined
@@ -287,6 +307,7 @@ export class AssRenderer extends EventTarget {
     void this.reloadFromOptions()
   }
 
+  /** Replace the current track from ASS text or bytes. */
   setTrack(content: string | Uint8Array | ArrayBuffer): void {
     this.options.subContent = content
     this.options.subUrl = undefined
@@ -294,6 +315,7 @@ export class AssRenderer extends EventTarget {
     void this.setTrackInternal(decodeSubtitleBytes(content), 'trackReady')
   }
 
+  /** Replace the current track from an encrypted payload. */
   setEncryptedTrack(content: EncryptedSubtitleContent): void {
     this.options.encryptedSubContent = content
     this.options.subContent = undefined
@@ -301,6 +323,7 @@ export class AssRenderer extends EventTarget {
     void this.reloadFromOptions()
   }
 
+  /** Unload the current track and clear the overlay. */
   freeTrack(): void {
     this.bumpRenderEpoch()
     this.opened?.dispose()
@@ -312,16 +335,19 @@ export class AssRenderer extends EventTarget {
     this.clearCanvas()
   }
 
+  /** Override the paused flag used by manual clock control. */
   setIsPaused(isPaused: boolean): void {
     this.state.isPaused = isPaused
     this.syncVideoClock()
   }
 
+  /** Override the playback rate used by manual clock control. */
   setRate(rate: number): void {
     this.state.rate = rate
     this.setCurrentTime(this.isVideoPaused(), this.currentVideoTimeWithOffset(), rate)
   }
 
+  /** Override paused/currentTime/rate together for manual clock control. */
   setCurrentTime(isPaused?: boolean, currentTime?: number, rate?: number): void {
     if (typeof isPaused === 'boolean') this.state.isPaused = isPaused
     if (typeof currentTime === 'number') this.state.currentTime = currentTime
@@ -329,58 +355,69 @@ export class AssRenderer extends EventTarget {
     this.renderAtMediaTime((currentTime ?? this.state.currentTime) - this.timeOffset, true)
   }
 
+  /** Append an ASS event and rebuild the in-memory track. */
   createEvent(event: Partial<ASSEvent>): void {
     this.events.push(normalizeEvent(event, this.events.length))
     void this.rebuildTrackFromState()
   }
 
+  /** Patch an ASS event by index and rebuild the in-memory track. */
   setEvent(event: Partial<ASSEvent>, index: number): void {
     assertIndex(index, this.events.length, 'event')
     this.events[index] = { ...this.events[index], ...event }
     void this.rebuildTrackFromState()
   }
 
+  /** Remove an ASS event by index and rebuild the in-memory track. */
   removeEvent(index: number): void {
     assertIndex(index, this.events.length, 'event')
     this.events.splice(index, 1)
     void this.rebuildTrackFromState()
   }
 
+  /** Return a copy of the current ASS events. */
   async getEvents(): Promise<ASSEvent[]> {
     return this.events.map((event, index) => ({ ...event, _index: index }))
   }
 
+  /** Apply a style override patch to every style. */
   styleOverride(style: Partial<ASSStyle>): void {
     this.styleOverridePatch = { ...style }
     void this.rebuildTrackFromState()
   }
 
+  /** Clear the style override patch. */
   disableStyleOverride(): void {
     this.styleOverridePatch = null
     void this.rebuildTrackFromState()
   }
 
+  /** Append an ASS style and rebuild the in-memory track. */
   createStyle(style: Partial<ASSStyle>): void {
     this.styles.push(normalizeStyle(style, this.styles.length))
     void this.rebuildTrackFromState()
   }
 
+  /** Patch an ASS style by index and rebuild the in-memory track. */
   setStyle(style: Partial<ASSStyle>, index: number): void {
     assertIndex(index, this.styles.length, 'style')
     this.styles[index] = { ...this.styles[index], ...style }
     void this.rebuildTrackFromState()
   }
 
+  /** Remove an ASS style by index and rebuild the in-memory track. */
   removeStyle(index: number): void {
     assertIndex(index, this.styles.length, 'style')
     this.styles.splice(index, 1)
     void this.rebuildTrackFromState()
   }
 
+  /** Return a copy of the effective ASS styles. */
   async getStyles(): Promise<ASSStyle[]> {
     return this.effectiveStyles().map((style) => ({ ...style }))
   }
 
+  /** Register an extra font and keep it for later track rebuilds. */
   async addFont(font: string | Uint8Array | RwssFontSource, data?: Uint8Array | ArrayBuffer | ArrayBufferView): Promise<string | undefined> {
     const source = data && typeof font === 'string' ? { name: font, data } : font
     if (typeof source !== 'string' && !(source instanceof Uint8Array) && 'data' in source) {
@@ -398,6 +435,7 @@ export class AssRenderer extends EventTarget {
     return registeredPath
   }
 
+  /** Change the default/fallback font family. */
   setDefaultFont(font: string): void {
     this.defaultFont = font
     if (this.styles.length === 0) this.styles.push(normalizeStyle({ FontName: font }, 0))
@@ -405,14 +443,17 @@ export class AssRenderer extends EventTarget {
     void this.rebuildTrackFromState()
   }
 
+  /** Return current renderer performance stats. */
   async getStats(): Promise<PerformanceStats> {
     return this.buildStats()
   }
 
+  /** Return a synchronous stats snapshot including the active backend. */
   getStatsSnapshot(): RwssRendererStatsSnapshot {
     return { ...this.buildStats(), backend: this.backend }
   }
 
+  /** Reset render counters and learned timing compensation. */
   async resetStats(): Promise<void> {
     this.framesRendered = 0
     this.framesDropped = 0
@@ -425,24 +466,29 @@ export class AssRenderer extends EventTarget {
     this.timingCompensationSeconds = 0
   }
 
+  /** Return the number of ASS events in the current track. */
   async getEventCount(): Promise<number> {
     return this.events.length
   }
 
+  /** Return the number of ASS styles in the current track. */
   async getStyleCount(): Promise<number> {
     return this.styles.length
   }
 
+  /** Emit an observability message event. */
   async sendMessage(target: string, data?: unknown, _transferable?: Transferable[]): Promise<void> {
     this.emitEvent({ type: 'message', target, data })
     if (this.debug) console.debug('[rwss]', target, data)
   }
 
+  /** Render the current video or manual clock time. */
   renderCurrentTime(force = false): void {
     const mediaTime = this.options.video?.currentTime ?? this.state.currentTime - this.timeOffset
     this.renderAtMediaTime(mediaTime, force)
   }
 
+  /** Stop rendering, dispose parser state, and remove auto-created canvases. */
   destroy(err?: Error | string): Error | undefined {
     this.destroyed = true
     this.stop()
@@ -993,8 +1039,10 @@ export class AssRenderer extends EventTarget {
   }
 }
 
+/** Default export of {@link AssRenderer}. */
 export default AssRenderer
 
+/** Construct an AssRenderer. */
 export function createAssRenderer(options: VideoAssSubtitleOptions): AssRenderer {
   return new AssRenderer(options)
 }

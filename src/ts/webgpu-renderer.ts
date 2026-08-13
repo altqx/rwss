@@ -1,6 +1,7 @@
 import type { AssSubtitleData, RenderImage, RwssPlaneData } from './types'
 import { composeAssFrameCpu, limitAssImages, putCompositionOnCanvas, type RwssImageCompositionResult } from './gpu-compositor'
 
+/** Construction options for WebGPURenderer. */
 export interface WebGPURendererOptions {
   device?: GPUDevice
   context?: GPUCanvasContext
@@ -13,7 +14,9 @@ interface WebGPUPipelineState {
   vertexBuffer: GPUBuffer
 }
 
+/** WebGPU compositor for ASS image planes, with CPU fallback. */
 export class WebGPURenderer {
+  /** Backend identifier. */
   readonly type = 'webgpu' as const
   private device: GPUDevice | null
   private context: GPUCanvasContext | null
@@ -22,6 +25,7 @@ export class WebGPURenderer {
   private initPromise: Promise<boolean> | null = null
   private _canvas?: HTMLCanvasElement | OffscreenCanvas
 
+  /** Bind an optional canvas and optional pre-created GPU device/context. */
   constructor(canvas?: HTMLCanvasElement | OffscreenCanvas, options: WebGPURendererOptions = {}) {
     this._canvas = canvas
     this.device = options.device ?? null
@@ -29,20 +33,24 @@ export class WebGPURenderer {
     this.format = options.format ?? getPreferredCanvasFormat()
   }
 
+  /** Canvas currently bound to this renderer. */
   get canvas(): HTMLCanvasElement | OffscreenCanvas | undefined {
     return this._canvas
   }
 
+  /** Whether a GPU device has been acquired. */
   get initialized(): boolean {
     return !!this.device
   }
 
+  /** Construct and initialize a WebGPU renderer. */
   static async create(canvas?: HTMLCanvasElement | OffscreenCanvas, options: WebGPURendererOptions = {}): Promise<WebGPURenderer> {
     const renderer = new WebGPURenderer(canvas, options)
     await renderer.init()
     return renderer
   }
 
+  /** Acquire a GPU device if one is not already set. */
   async init(): Promise<boolean> {
     if (this.device) {
       this.configureContext()
@@ -53,6 +61,7 @@ export class WebGPURenderer {
     return this.initPromise
   }
 
+  /** Compose ASS planes or raw images. The sync ASS path uses CPU fallback. */
   render(data: AssSubtitleData): RwssImageCompositionResult
   render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
   render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): RwssImageCompositionResult | void {
@@ -68,6 +77,7 @@ export class WebGPURenderer {
     return result
   }
 
+  /** Compose ASS planes through WebGPU, falling back to CPU on failure. */
   async renderAsync(data: AssSubtitleData): Promise<RwssImageCompositionResult> {
     if (!await this.init()) return this.render(data)
 
@@ -106,6 +116,7 @@ export class WebGPURenderer {
     this.device.queue.submit([encoder.finish()])
   }
 
+  /** Release GPU pipeline resources. */
   destroy(): void {
     this.pipelineState?.vertexBuffer.destroy()
     this.pipelineState = null
@@ -302,6 +313,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4f {
   }
 }
 
+/** Whether navigator.gpu is available. */
 export function isWebGPUSupported(): boolean {
   return !!getNavigatorGpu()
 }

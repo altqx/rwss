@@ -148,6 +148,7 @@ export const predictFrameDisplayTimeMs = (
   return displayGridAnchorMs! + refreshesFromAnchor * refreshIntervalMs
 }
 
+/** Normalize an encoded-frame timeline and optional clock offsets. */
 export const normalizeFrameTimeline = (
   frameTimes: ArrayLike<number> & { mediaTimeOrigin?: number; subtitleTimeOffset?: number }
 ): Float64Array & { mediaTimeOrigin?: number; subtitleTimeOffset?: number } => {
@@ -176,6 +177,7 @@ export const normalizeFrameTimeline = (
   return normalized
 }
 
+/** First timeline index at or after a media time. */
 export const frameIndexAtOrAfter = (frameTimes: ArrayLike<number>, mediaTime: number): number => {
   if (frameTimes.length === 0 || !Number.isFinite(mediaTime)) return -1
 
@@ -189,6 +191,7 @@ export const frameIndexAtOrAfter = (frameTimes: ArrayLike<number>, mediaTime: nu
   return low < frameTimes.length ? low : frameTimes.length - 1
 }
 
+/** Nearest timeline index to a media time. */
 export const nearestFrameIndex = (frameTimes: ArrayLike<number>, mediaTime: number): number => {
   const next = frameIndexAtOrAfter(frameTimes, mediaTime)
   if (next <= 0) return next
@@ -196,12 +199,14 @@ export const nearestFrameIndex = (frameTimes: ArrayLike<number>, mediaTime: numb
   return mediaTime - frameTimes[previous] <= frameTimes[next] - mediaTime ? previous : next
 }
 
+/** Greatest timeline index still being presented at a media time. */
 export const presentedFrameIndex = (frameTimes: ArrayLike<number>, mediaTime: number): number => {
   const next = frameIndexAtOrAfter(frameTimes, mediaTime)
   if (next < 0) return next
   return next > 0 && frameTimes[next] > mediaTime ? next - 1 : next
 }
 
+/** Snap a media time onto the encoded-frame timeline. */
 export const snapToFrameTimeline = (frameTimes: ArrayLike<number>, mediaTime: number): number => {
   const index = presentedFrameIndex(frameTimes, mediaTime)
   return index >= 0 ? frameTimes[index] : mediaTime
@@ -217,6 +222,7 @@ export const snapToSubtitleTimeline = (
   return Math.max(0, frameTime - offset)
 }
 
+/** Subtitle clock for an encoded-frame index. */
 export const subtitleTimeForFrame = (
   frameTimes: ArrayLike<number> & { subtitleTimeOffset?: number },
   frameIndex: number
@@ -228,6 +234,7 @@ export const subtitleTimeForFrame = (
 }
 
 // Exact timelines identify the presented frame; do not latency-predict into a future frame.
+/** Choose the media time used to sample ASS for a presentation. */
 export const selectRenderMediaTime = (
   frameTimes: (ArrayLike<number> & { subtitleTimeOffset?: number }) | null,
   mediaTime: number,
@@ -235,6 +242,7 @@ export const selectRenderMediaTime = (
   _isPaused: boolean
 ): number => (frameTimes ? snapToSubtitleTimeline(frameTimes, mediaTime) : predictedMediaTime)
 
+/** Whether a presentation id has been superseded. */
 export const isStalePresentation = (presentationId: number | undefined, latestPresentationId: number): boolean =>
   presentationId != null && presentationId < latestPresentationId
 

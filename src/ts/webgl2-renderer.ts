@@ -1,7 +1,9 @@
 import type { AssSubtitleData, RenderImage, RwssPlaneData } from './types'
 import { composeAssFrameCpu, limitAssImages, type RwssImageCompositionResult } from './gpu-compositor'
 
+/** WebGL2 compositor for ASS image planes, with CPU fallback. */
 export class WebGL2Renderer {
+  /** Backend identifier. */
   readonly type = 'webgl2' as const
   private _canvas?: HTMLCanvasElement | OffscreenCanvas
   private gl: WebGL2RenderingContext | null
@@ -12,24 +14,29 @@ export class WebGL2Renderer {
   private texCoordLocation = -1
   private textureLocation: WebGLUniformLocation | null = null
 
+  /** Bind an optional canvas and create a WebGL2 context. */
   constructor(canvas?: HTMLCanvasElement | OffscreenCanvas) {
     this._canvas = canvas
     this.gl = getWebGL2Context(canvas)
   }
 
+  /** Canvas currently bound to this renderer. */
   get canvas(): HTMLCanvasElement | OffscreenCanvas | undefined {
     return this._canvas
   }
 
+  /** Whether a WebGL2 context is available. */
   get initialized(): boolean {
     return !!this.gl
   }
 
+  /** Ensure a WebGL2 context exists. */
   async init(): Promise<void> {
     if (!this.gl) this.gl = getWebGL2Context(this._canvas)
     if (!this.gl) throw new Error('WebGL2 not supported')
   }
 
+  /** Rebind the compositor to a new canvas and viewport size. */
   async setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, width: number, height: number): Promise<void> {
     this._canvas = canvas
     this.gl = getWebGL2Context(canvas)
@@ -39,6 +46,7 @@ export class WebGL2Renderer {
     this.gl.viewport(0, 0, canvas.width, canvas.height)
   }
 
+  /** Resize the current canvas and GL viewport. */
   updateSize(width: number, height: number): void {
     if (!this._canvas || width <= 0 || height <= 0) return
     this._canvas.width = width
@@ -46,6 +54,7 @@ export class WebGL2Renderer {
     this.gl?.viewport(0, 0, width, height)
   }
 
+  /** Compose ASS planes through WebGL2, falling back to CPU on failure. */
   render(data: AssSubtitleData): RwssImageCompositionResult
   render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
   render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): RwssImageCompositionResult | void {
@@ -72,6 +81,7 @@ export class WebGL2Renderer {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT)
   }
 
+  /** Release the WebGL2 program and buffers. */
   destroy(): void {
     const gl = this.gl
     if (!gl) return
@@ -207,6 +217,7 @@ void main() {
   }
 }
 
+/** Whether a WebGL2 canvas context can be created. */
 export function isWebGL2Supported(): boolean {
   if (typeof document === 'undefined') return false
   return !!document.createElement('canvas').getContext('webgl2')

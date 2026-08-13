@@ -1,7 +1,11 @@
+/** ASS/SSA format identifier. */
 export type AssSubtitleFormatName = 'ass'
+/** Active presentation backend for composed ASS frames. */
 export type RwssRendererBackend = 'canvas2d' | 'webgl2' | 'webgpu'
+/** Whether composed frames keep the full PlayRes screen or crop to ink bounds. */
 export type RwssFrameCropMode = 'screen' | 'bounds'
 
+/** Parsed ASS script metadata returned by the WASM parser. */
 export interface AssMetadata {
   format: AssSubtitleFormatName
   cueCount: number
@@ -16,11 +20,16 @@ export interface AssMetadata {
   language: string
 }
 
+/** Maximum accepted font file size in bytes (32 MiB). */
 export const MAX_FONT_BYTES = 32 * 1024 * 1024
+/** Maximum ASS image planes accepted in one composed frame. */
 export const MAX_RENDER_IMAGES = 8192
+/** Maximum total pixels accepted across composed ASS image planes. */
 export const MAX_RENDER_PIXELS = 32 * 1024 * 1024
+/** Maximum exact-frame prefetch runway accepted by AssRenderer. */
 export const MAX_FRAME_PREFETCH = 24
 
+/** One ASS dialogue or comment event. */
 export interface ASSEvent {
   /** Start time in seconds. */
   Start: number
@@ -38,6 +47,7 @@ export interface ASSEvent {
   _index?: number
 }
 
+/** One ASS style record. */
 export interface ASSStyle {
   Name: string
   FontName: string
@@ -67,6 +77,7 @@ export interface ASSStyle {
   Justify: number
 }
 
+/** AES-GCM encrypted subtitle payload used for Akari-style handoff. */
 export interface EncryptedSubtitleContent {
   /** AES-GCM content key. Raw 128/192/256-bit key bytes are accepted for akari-crypto style handoff. */
   contentKey: CryptoKey | Uint8Array | ArrayBuffer | ArrayBufferView
@@ -74,6 +85,7 @@ export interface EncryptedSubtitleContent {
   encryptedChunks?: ArrayBuffer[]
 }
 
+/** One rassa/libass image plane in RGBA. */
 export interface RwssPlaneData {
   x: number
   y: number
@@ -85,12 +97,14 @@ export interface RwssPlaneData {
   rgba: Uint8Array | number[]
 }
 
+/** Raw ASS composition for a single timestamp. */
 export interface AssSubtitleData {
   width: number
   height: number
   compositionData: RwssPlaneData[]
 }
 
+/** Axis-aligned bounds of visible subtitle ink. */
 export interface AssCueBounds {
   x: number
   y: number
@@ -98,6 +112,7 @@ export interface AssCueBounds {
   height: number
 }
 
+/** Flattened RGBA frame plus placement metadata. */
 export interface AssRenderedFrameData {
   imageData: ImageData
   bounds: AssCueBounds | null
@@ -109,10 +124,12 @@ export interface AssRenderedFrameData {
   compositionCount: number
 }
 
+/** Options for flattening ASS planes into RGBA. */
 export interface AssFrameRenderOptions {
   crop?: RwssFrameCropMode
 }
 
+/** In-memory ASS document handle returned by openAss(). */
 export interface OpenedAssSubtitles {
   readonly format: AssSubtitleFormatName
   readonly metadata: AssMetadata
@@ -127,6 +144,7 @@ export interface OpenedAssSubtitles {
   dispose(): void
 }
 
+/** Options when registering a single font. */
 export interface RwssFontLoadOptions {
   name?: string
   aliases?: string[]
@@ -135,15 +153,18 @@ export interface RwssFontLoadOptions {
   timeoutMs?: number
 }
 
+/** Options when registering a named font map. */
 export interface RwssAvailableFontLoadOptions {
   fallbackFonts?: string[]
   timeoutMs?: number
 }
 
+/** In-memory font bytes plus optional family metadata. */
 export interface RwssFontSource extends RwssFontLoadOptions {
   data: Uint8Array | ArrayBuffer | ArrayBufferView
 }
 
+/** Font currently registered in the virtual font registry. */
 export interface RwssRegisteredFont {
   family: string
   aliases: string[]
@@ -152,6 +173,7 @@ export interface RwssRegisteredFont {
   isFallback?: boolean
 }
 
+/** Font selected for a family query. */
 export interface RwssResolvedFont {
   family: string
   path?: string
@@ -167,6 +189,7 @@ export interface FrameTimeline extends ArrayLike<number> {
   subtitleTimeOffset?: number
 }
 
+/** Construction options for AssRenderer / AkariSub. */
 export interface VideoAssSubtitleOptions {
   video?: HTMLVideoElement
   canvas?: HTMLCanvasElement
@@ -228,6 +251,7 @@ export interface VideoAssSubtitleOptions {
 /** @deprecated Use VideoAssSubtitleOptions. */
 export type AkariSubOptions = VideoAssSubtitleOptions
 
+/** Renderer counters and last-frame timing. */
 export interface PerformanceStats {
   framesRendered: number
   framesDropped: number
@@ -254,13 +278,17 @@ export interface PerformanceStats {
   onDemandRender: boolean
 }
 
+/** Performance stats plus the active backend. */
 export interface RwssRendererStatsSnapshot extends PerformanceStats {
   backend: RwssRendererBackend
 }
 
+/** libass YCbCr color-space name, or null when unknown. */
 export type SubtitleColorSpace = 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
+/** Browser YCbCr color-space name used for CSS filters. */
 export type WebYCbCrColorSpace = 'BT709' | 'BT601'
 
+/** One decoded bitmap or buffer to composite. */
 export interface RenderImage {
   x: number
   y: number
@@ -281,6 +309,7 @@ export interface RawASSImage {
   type: number
 }
 
+/** Subset of HTMLVideoElement.requestVideoFrameCallback metadata. */
 export interface VideoFrameCallbackMetadata {
   mediaTime: number
   width: number
@@ -291,6 +320,7 @@ export interface VideoFrameCallbackMetadata {
   presentationTime?: number
 }
 
+/** Worker outbound message carrying a composed frame. */
 export interface RenderMessage {
   target: 'render'
   asyncRender?: boolean
@@ -304,6 +334,7 @@ export interface RenderMessage {
   presentationId?: number
 }
 
+/** Optional per-stage render timing breakdown. */
 export interface RenderTimes {
   WASMRenderTime?: number
   WASMBitmapDecodeTime?: number
@@ -313,6 +344,7 @@ export interface RenderTimes {
   bitmaps?: number
 }
 
+/** Messages posted from the rwss worker runtime. */
 export type WorkerOutboundMessage =
   | { target: 'ready' }
   | { target: 'trackReady' }
@@ -331,6 +363,7 @@ export type WorkerOutboundMessage =
   | { target: 'presented'; presentationId: number; renderEpoch?: number; frameIndex?: number }
   | RenderMessage
 
+/** Worker init payload for OffscreenCanvas rendering. */
 export interface WorkerInitMessage {
   target: 'init'
   wasmUrl: string
@@ -369,6 +402,7 @@ export interface WorkerInitMessage {
   hasBitmapBug: boolean
 }
 
+/** Messages posted to the rwss worker runtime. */
 export type WorkerInboundMessage =
   | WorkerInitMessage
   | { target: 'offscreenCanvas'; rawAssImageGpu?: boolean; transferable: [OffscreenCanvas] }
@@ -418,11 +452,16 @@ export type WorkerInboundMessage =
   | { target: 'runBenchmark' }
   | { target: 'getColorSpace' }
 
+/** Callback receiving the current ASS event list. */
 export type ASSEventCallback = (error: Error | null, events: ASSEvent[]) => void
+/** Callback receiving the current ASS style list. */
 export type ASSStyleCallback = (error: Error | null, styles: ASSStyle[]) => void
+/** Callback receiving renderer performance stats. */
 export type PerformanceStatsCallback = (error: Error | null, stats: PerformanceStats | null) => void
+/** Callback fired after stats are reset. */
 export type ResetStatsCallback = (error: Error | null) => void
 
+/** Observability event emitted by AssRenderer. */
 export type RwssRendererEvent =
   | { type: 'load-start' }
   | { type: 'load-complete'; metadata: AssMetadata }

@@ -13,7 +13,9 @@ import type {
 
 type WasmModule = typeof import('../../pkg/rwss')
 
+/** Default fallback font family list. */
 export const DEFAULT_FALLBACK_FONTS = ['liberation sans']
+/** Packaged Liberation Sans mapping used when no fonts are supplied. */
 export const DEFAULT_AVAILABLE_FONTS: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView> = {
   'liberation sans': new URL('../default.woff2', import.meta.url).toString()
 }
@@ -22,6 +24,7 @@ let wasmModule: WasmModule | null = null
 let wasmInitPromise: Promise<WasmModule> | null = null
 let wasmUrl: string | URL | Request = getDefaultWasmUrl()
 
+/** Initialize the generated WASM module. Safe to call more than once. */
 export async function initWasm(input?: string | URL | Request): Promise<WasmModule> {
   if (wasmModule) return wasmModule
   if (wasmInitPromise) return wasmInitPromise
@@ -43,10 +46,12 @@ export async function initWasm(input?: string | URL | Request): Promise<WasmModu
   return wasmInitPromise
 }
 
+/** Whether initWasm() has completed. */
 export function isWasmInitialized(): boolean {
   return wasmModule !== null
 }
 
+/** Return the initialized WASM module, or throw if it is not ready. */
 export function getWasm(): WasmModule {
   if (!wasmModule) {
     throw new Error('rwss WASM is not initialized. Call initWasm() first.')
@@ -54,6 +59,7 @@ export function getWasm(): WasmModule {
   return wasmModule
 }
 
+/** Return the configured or default WASM asset URL. */
 export function getWasmUrl(): string | URL | Request {
   return wasmUrl
 }
@@ -75,6 +81,7 @@ if (typeof window !== 'undefined') {
   }, 100)
 }
 
+/** Register a font from a URL, bytes, or RwssFontSource. */
 export async function registerFont(font: RwssFontSource | string, data?: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): Promise<string | undefined> {
   await initWasm(wasmUrl)
   if (typeof font === 'string') {
@@ -85,6 +92,7 @@ export async function registerFont(font: RwssFontSource | string, data?: Uint8Ar
   return registerFontData(font.data, { ...font, ...options, aliases: dedupeAliases([...(font.aliases ?? []), ...(options?.aliases ?? [])]) })
 }
 
+/** Register a named map of fonts and optional fallbacks. */
 export async function registerAvailableFonts(fonts?: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView>, options: RwssAvailableFontLoadOptions = {}): Promise<string[]> {
   if (!fonts) return []
   await initWasm(wasmUrl)
@@ -104,33 +112,39 @@ export async function registerAvailableFonts(fonts?: Record<string, string | Uin
   return registered
 }
 
+/** Register already-loaded font bytes under a family name. */
 export function registerFontBytes(name: string, data: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): string {
   const mod = getWasm() as WasmModule & { registerFont?: (name: string, bytes: Uint8Array, options?: unknown) => string }
   if (!mod.registerFont) throw new Error('rwss WASM registerFont export is unavailable; rebuild pkg with wasm-pack')
   return mod.registerFont(name, toUint8Array(data), options)
 }
 
+/** Register font bytes and infer family metadata from options. */
 export function registerFontData(data: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): string {
   const mod = getWasm() as WasmModule & { registerFontData?: (bytes: Uint8Array, options?: unknown) => string }
   if (!mod.registerFontData) throw new Error('rwss WASM registerFontData export is unavailable; rebuild pkg with wasm-pack')
   return mod.registerFontData(toUint8Array(data), options)
 }
 
+/** Replace the virtual font registry fallback list. */
 export function setFallbackFonts(fonts: string[]): void {
   const mod = getWasm() as WasmModule & { setFallbackFonts?: (fonts: string[]) => void }
   mod.setFallbackFonts?.(fonts)
 }
 
+/** Remove every font from the virtual registry. */
 export function clearRegisteredFonts(): void {
   const mod = getWasm() as WasmModule & { clearRegisteredFonts?: () => void }
   mod.clearRegisteredFonts?.()
 }
 
+/** List fonts currently in the virtual registry. */
 export function listRegisteredFonts(): RwssRegisteredFont[] {
   const mod = getWasm() as WasmModule & { listRegisteredFonts?: () => RwssRegisteredFont[] }
   return mod.listRegisteredFonts?.() ?? []
 }
 
+/** Resolve a family name through the virtual font registry. */
 export function resolveFont(name: string): RwssResolvedFont | null {
   const mod = getWasm() as WasmModule & { resolveFont?: (name: string) => RwssResolvedFont }
   return mod.resolveFont?.(name) ?? null
@@ -172,15 +186,18 @@ function toUint8Array(data: Uint8Array | ArrayBuffer | ArrayBufferView): Uint8Ar
   return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
 }
 
+/** Wrap raw RGBA bytes in an ImageData. */
 export function imageDataFromBytes(bytes: Uint8Array | number[], width: number, height: number): ImageData {
   const data = bytes instanceof Uint8Array ? new Uint8ClampedArray(bytes) : new Uint8ClampedArray(bytes)
   return new ImageData(data, width, height)
 }
 
+/** Convert one ASS plane to ImageData. */
 export function planeToImageData(plane: RwssPlaneData): ImageData {
   return imageDataFromBytes(plane.rgba, plane.width, plane.height)
 }
 
+/** Normalize a WASM frame export into AssRenderedFrameData. */
 export function normalizeFrameData(raw: Omit<AssRenderedFrameData, 'imageData'> & { imageData: Uint8Array | number[] }): AssRenderedFrameData {
   return {
     ...raw,
@@ -188,6 +205,7 @@ export function normalizeFrameData(raw: Omit<AssRenderedFrameData, 'imageData'> 
   }
 }
 
+/** Compose ASS planes into a cropped or full-screen RGBA frame. */
 export function renderAssDataToFrame(data: AssSubtitleData, crop: RwssFrameCropMode = 'screen'): AssRenderedFrameData {
   const bounds = getAssBounds(data.compositionData)
   const targetBounds = crop === 'bounds' && bounds ? bounds : { x: 0, y: 0, width: data.width, height: data.height }
@@ -209,10 +227,12 @@ export function renderAssDataToFrame(data: AssSubtitleData, crop: RwssFrameCropM
   }
 }
 
+/** Compose a subtitle frame into RGBA pixels. */
 export function renderFrameData(data: AssSubtitleData, options?: AssFrameRenderOptions): AssRenderedFrameData {
   return renderAssDataToFrame(data, options?.crop ?? 'screen')
 }
 
+/** Draw rendered frame data onto a canvas. */
 export function toCanvas(frame: AssRenderedFrameData, canvas?: HTMLCanvasElement | OffscreenCanvas): HTMLCanvasElement | OffscreenCanvas {
   const target = canvas ?? document.createElement('canvas')
   target.width = frame.imageData.width
@@ -223,6 +243,7 @@ export function toCanvas(frame: AssRenderedFrameData, canvas?: HTMLCanvasElement
   return target
 }
 
+/** Encode rendered frame data as an image Blob. */
 export async function toBlob(frame: AssRenderedFrameData, type = 'image/png', quality?: number): Promise<Blob> {
   const canvas = toCanvas(frame)
   if ('convertToBlob' in canvas) {
@@ -233,10 +254,12 @@ export async function toBlob(frame: AssRenderedFrameData, type = 'image/png', qu
   })
 }
 
+/** Create an ImageBitmap from rendered frame data. */
 export async function toImageBitmap(frame: AssRenderedFrameData): Promise<ImageBitmap> {
   return createImageBitmap(frame.imageData)
 }
 
+/** get Ass Bounds. */
 export function getAssBounds(planes: RwssPlaneData[]) {
   let xMin = Infinity
   let yMin = Infinity

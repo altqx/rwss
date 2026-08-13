@@ -1,13 +1,23 @@
 /**
- * rwss - web browser ASS/SSA subtitle renderer powered by rassa.
+ * Browser ASS/SSA subtitle renderer powered by the pure-Rust rassa engine.
  *
- * @packageDocumentation
+ * High-level video overlay rendering, WASM initialization, font registration,
+ * GPU composition, and worker/offscreen helpers.
+ *
+ * @module
  */
 
+/** High-level video/canvas ASS renderer with RVFC sync and GPU fallback. */
+export { AssRenderer } from './wrapper'
+
+/** Alias of {@link AssRenderer} for AkariSub-compatible integrations. */
+export { AkariSub } from './wrapper'
+
+/** Default export of {@link AssRenderer}. */
+export { default } from './wrapper'
+
 export {
-  AkariSub,
   AssParser,
-  AssRenderer,
   createAssRenderer,
   detectSubtitleFormat,
   renderFrameData,
@@ -76,7 +86,6 @@ export {
   subtitleTimeForFrame,
   updateTimingCompensation
 } from './wrapper'
-export { default } from './wrapper'
 
 export type {
   AssCueBounds,

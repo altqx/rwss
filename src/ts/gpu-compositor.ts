@@ -1,6 +1,7 @@
 import type { AssSubtitleData, RwssPlaneData } from './types'
 import { MAX_RENDER_IMAGES, MAX_RENDER_PIXELS } from './types'
 
+/** Cap composed image count and pixel budget. */
 export function limitAssImages<T extends { width?: number; height?: number; w?: number; h?: number }>(images: readonly T[]): T[] {
   const limited: T[] = []
   let pixels = 0
@@ -16,8 +17,10 @@ export function limitAssImages<T extends { width?: number; height?: number; w?: 
   return limited
 }
 
+/** Backend used to compose ASS image planes. */
 export type RwssImageCompositionBackend = 'webgpu' | 'webgl2' | 'canvas2d'
 
+/** Result of composing ASS planes onto a bitmap. */
 export interface RwssImageCompositionResult {
   backend: RwssImageCompositionBackend
   width: number
@@ -29,12 +32,14 @@ export interface RwssImageCompositionResult {
   usedFallback: boolean
 }
 
+/** Options for the CPU/GPU image compositor. */
 export interface RwssImageCompositorOptions {
   canvas?: HTMLCanvasElement | OffscreenCanvas
   backend: RwssImageCompositionBackend
   preferGpu?: boolean
 }
 
+/** Compose ASS planes on the CPU and return a bitmap result. */
 export function composeAssFrameCpu(data: AssSubtitleData, backend: RwssImageCompositionBackend, usedFallback = true): RwssImageCompositionResult {
   const planes = limitAssImages(data.compositionData)
   const rgba = new Uint8Array(data.width * data.height * 4)
@@ -52,6 +57,7 @@ export function composeAssFrameCpu(data: AssSubtitleData, backend: RwssImageComp
   }
 }
 
+/** Blit a composition result onto a canvas. */
 export function putCompositionOnCanvas(result: RwssImageCompositionResult, canvas?: HTMLCanvasElement | OffscreenCanvas): void {
   if (!canvas || typeof ImageData === 'undefined') return
   canvas.width = result.width

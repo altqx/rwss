@@ -1,5 +1,7 @@
 /**
- * rwss TypeScript modules barrel export.
+ * Internal TypeScript barrel for the rwss public API.
+ *
+ * @module
  */
 
 export type {
@@ -75,8 +77,10 @@ export {
   type RwssWorkerResponse
 } from './worker-client'
 export { AssParser, detectSubtitleFormat, normalizeError, openAss } from './parsers'
-export { AssRenderer, AssRenderer as AkariSub, createAssRenderer }
-  from './renderers'
+export { AssRenderer, createAssRenderer } from './renderers'
+/** Alias of {@link AssRenderer} for AkariSub-compatible integrations. */
+export { AssRenderer as AkariSub } from './renderers'
+/** Default export of {@link AssRenderer}. */
 export { default } from './renderers'
 export {
   colorMatrixConversionMap,

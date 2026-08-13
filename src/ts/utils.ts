@@ -1,11 +1,13 @@
 import type { SubtitleColorSpace, WebYCbCrColorSpace } from './types'
 
+/** Map of browser color-matrix names to Web YCbCr spaces. */
 export const webYCbCrMap: Record<string, WebYCbCrColorSpace> = {
   bt709: 'BT709',
   bt470bg: 'BT601',
   smpte170m: 'BT601'
 }
 
+/** Map of libass TV.* color-space names. */
 export const libassYCbCrMap: Record<string, SubtitleColorSpace> = {
   'TV.601': 'BT601',
   'TV.709': 'BT709',
@@ -13,6 +15,7 @@ export const libassYCbCrMap: Record<string, SubtitleColorSpace> = {
   'TV.FCC': 'FCC'
 }
 
+/** CSS feColorMatrix values for YCbCr conversions. */
 export const colorMatrixConversionMap: Record<string, Record<string, string>> = {
   BT601: {
     BT709: '1.0864 -0.0723 -0.0141 0 0 0.0965 0.8451 0.0584 0 0 -0.0141 -0.0277 1.0418 0 0 0 0 0 1 0'
@@ -22,7 +25,9 @@ export const colorMatrixConversionMap: Record<string, Record<string, string>> = 
   }
 }
 
+/** Compute overlay canvas CSS/backing size from a video or pixel size. */
 export function computeCanvasSize(video: HTMLVideoElement, maxRenderHeight?: number): { width: number; height: number }
+/** Compute overlay canvas CSS/backing size from a video or pixel size. */
 export function computeCanvasSize(
   width: number,
   height: number,
@@ -30,6 +35,7 @@ export function computeCanvasSize(
   prescaleHeightLimit?: number,
   maxRenderHeight?: number
 ): { width: number; height: number }
+/** Compute overlay canvas CSS/backing size from a video or pixel size. */
 export function computeCanvasSize(
   videoOrWidth: HTMLVideoElement | number,
   heightOrMax = 0,
@@ -46,6 +52,7 @@ export function computeCanvasSize(
   return computeRenderSize(videoOrWidth, heightOrMax, prescaleFactor, prescaleHeightLimit, maxRenderHeight)
 }
 
+/** compute Render Size. */
 export function computeRenderSize(
   width: number,
   height: number,
@@ -66,6 +73,7 @@ export function computeRenderSize(
   return { width: width * (newH / height), height: newH }
 }
 
+/** Compute letterboxed video content position inside its element. */
 export function getVideoPosition(
   video: HTMLVideoElement,
   videoWidth: number = video.videoWidth,
@@ -95,11 +103,13 @@ export function getVideoPosition(
   }
 }
 
+/** Clamp every alpha byte into 0–255. */
 export function fixAlpha(data: Uint8ClampedArray | Uint8Array): Uint8ClampedArray | Uint8Array {
   for (let index = 3; index < data.length; index += 4) data[index] = Math.max(0, Math.min(255, data[index]))
   return data
 }
 
+/** Split an ASS document into info, style, and event lines. */
 export function parseAss(text: string): { info: Record<string, string>; styles: string[]; events: string[] } {
   const info: Record<string, string> = {}
   const styles: string[] = []
@@ -117,10 +127,12 @@ export function parseAss(text: string): { info: Record<string, string>; styles: 
   return { info, styles, events }
 }
 
+/** Strip \\blur and \\be overrides from ASS text. */
 export function dropBlur(text: string): string {
   return text.replace(/\\(?:blur|be)\s*[-+]?\d*\.?\d+/gi, '')
 }
 
+/** Force PlayResX/PlayResY on an ASS document. */
 export function fixPlayRes(text: string, width = 384, height = 288): string {
   const hasX = /^PlayResX:/mi.test(text)
   const hasY = /^PlayResY:/mi.test(text)
@@ -131,10 +143,12 @@ export function fixPlayRes(text: string, width = 384, height = 288): string {
   return next
 }
 
+/** Probe known canvas ImageData/bitmap bugs. */
 export function testImageBugs(): { alphaBug: boolean; bitmapBug: boolean } {
   return { alphaBug: false, bitmapBug: false }
 }
 
+/** Report Canvas2D, WebGL2, WebGPU, and OffscreenCanvas support. */
 export function runFeatureTests(): { canvas2d: boolean; webgl2: boolean; webgpu: boolean; offscreenCanvas: boolean } {
   return {
     canvas2d: typeof document !== 'undefined' && !!document.createElement('canvas').getContext('2d'),
@@ -144,14 +158,17 @@ export function runFeatureTests(): { canvas2d: boolean; webgl2: boolean; webgpu:
   }
 }
 
+/** Whether this runtime has the canvas alpha ImageData bug. */
 export function getAlphaBug(): boolean {
   return testImageBugs().alphaBug
 }
 
+/** Whether this runtime has the createImageBitmap premultiply bug. */
 export function getBitmapBug(): boolean {
   return testImageBugs().bitmapBug
 }
 
+/** Build a data-URL SVG filter for a color-matrix conversion. */
 export function getColorSpaceFilterUrl(matrix: string): string {
   return `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='f'><feColorMatrix type='matrix' values='${encodeURIComponent(matrix)}'/></filter></svg>#f")`
 }

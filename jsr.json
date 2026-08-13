@@ -1,9 +1,18 @@
 {
   "name": "@altq/rwss",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
-  "exports": "./dist/index.js",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "publish": {
-    "include": ["dist", "pkg", "src/wrapper.ts", "README.md", "LICENSE", "Cargo.toml"]
+    "include": [
+      "src/**/*.ts",
+      "src/default.woff2",
+      "pkg",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": ["!pkg"]
   }
 }

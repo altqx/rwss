@@ -1,12 +1,15 @@
 import type { EncryptedSubtitleContent } from './types'
 
+/** Raw AES-GCM key bytes accepted by the crypto helpers. */
 export type RwssRawAesKey = Uint8Array | ArrayBuffer | ArrayBufferView
 
+/** Import raw AES-GCM key bytes or pass through a CryptoKey. */
 export async function importAesGcmKey(key: CryptoKey | RwssRawAesKey): Promise<CryptoKey> {
   if (isCryptoKey(key)) return key
   return crypto.subtle.importKey('raw', toArrayBuffer(key), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }
 
+/** Encrypt subtitle text or bytes as IV-prefixed AES-GCM chunks. */
 export async function createEncryptedSubtitleContent(content: string | Uint8Array | ArrayBuffer, key: CryptoKey | RwssRawAesKey): Promise<EncryptedSubtitleContent> {
   const contentKey = await importAesGcmKey(key)
   const iv = crypto.getRandomValues(new Uint8Array(12))
@@ -18,6 +21,7 @@ export async function createEncryptedSubtitleContent(content: string | Uint8Arra
   return { contentKey, encrypted: encrypted.buffer.slice(encrypted.byteOffset, encrypted.byteOffset + encrypted.byteLength) }
 }
 
+/** Decrypt an EncryptedSubtitleContent payload to UTF-8 text. */
 export async function decryptSubtitleContent(content: EncryptedSubtitleContent): Promise<string> {
   const contentKey = await importAesGcmKey(content.contentKey)
   const chunks = content.encryptedChunks ?? (content.encrypted ? [content.encrypted] : [])
