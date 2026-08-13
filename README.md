@@ -32,6 +32,14 @@ npm install rwss
 bun add rwss
 ```
 
+```bash
+deno add jsr:@altq/rwss
+```
+
+```bash
+cargo add rwss
+```
+
 ## WASM setup
 
 In most bundler-based projects, no manual WASM setup is required. `rwss` resolves the generated WASM asset relative to the package module URL, so bundlers such as Vite, webpack, and Rollup can emit the asset automatically.

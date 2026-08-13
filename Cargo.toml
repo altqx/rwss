@@ -5,8 +5,16 @@ edition = "2024"
 authors = ["altqx"]
 license = "MIT"
 description = "Web browser ASS/SSA renderer wrapper around the pure-Rust rassa renderer"
+readme = "README.md"
 repository = "https://github.com/altqx/rwss"
 keywords = ["ass", "ssa", "subtitle", "wasm", "rassa"]
+categories = ["multimedia::video", "wasm"]
+include = [
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/src/lib.rs",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
