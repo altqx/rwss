@@ -1,6 +1,6 @@
 export type AssSubtitleFormatName = 'ass'
-export type WrassRendererBackend = 'canvas2d' | 'webgl2' | 'webgpu'
-export type WrassFrameCropMode = 'screen' | 'bounds'
+export type RwssRendererBackend = 'canvas2d' | 'webgl2' | 'webgpu'
+export type RwssFrameCropMode = 'screen' | 'bounds'
 
 export interface AssMetadata {
   format: AssSubtitleFormatName
@@ -74,7 +74,7 @@ export interface EncryptedSubtitleContent {
   encryptedChunks?: ArrayBuffer[]
 }
 
-export interface WrassPlaneData {
+export interface RwssPlaneData {
   x: number
   y: number
   width: number
@@ -88,7 +88,7 @@ export interface WrassPlaneData {
 export interface AssSubtitleData {
   width: number
   height: number
-  compositionData: WrassPlaneData[]
+  compositionData: RwssPlaneData[]
 }
 
 export interface AssCueBounds {
@@ -105,12 +105,12 @@ export interface AssRenderedFrameData {
   offsetY: number
   screenWidth: number
   screenHeight: number
-  crop: WrassFrameCropMode
+  crop: RwssFrameCropMode
   compositionCount: number
 }
 
 export interface AssFrameRenderOptions {
-  crop?: WrassFrameCropMode
+  crop?: RwssFrameCropMode
 }
 
 export interface OpenedAssSubtitles {
@@ -127,7 +127,7 @@ export interface OpenedAssSubtitles {
   dispose(): void
 }
 
-export interface WrassFontLoadOptions {
+export interface RwssFontLoadOptions {
   name?: string
   aliases?: string[]
   style?: string
@@ -135,16 +135,16 @@ export interface WrassFontLoadOptions {
   timeoutMs?: number
 }
 
-export interface WrassAvailableFontLoadOptions {
+export interface RwssAvailableFontLoadOptions {
   fallbackFonts?: string[]
   timeoutMs?: number
 }
 
-export interface WrassFontSource extends WrassFontLoadOptions {
+export interface RwssFontSource extends RwssFontLoadOptions {
   data: Uint8Array | ArrayBuffer | ArrayBufferView
 }
 
-export interface WrassRegisteredFont {
+export interface RwssRegisteredFont {
   family: string
   aliases: string[]
   path: string
@@ -152,7 +152,7 @@ export interface WrassRegisteredFont {
   isFallback?: boolean
 }
 
-export interface WrassResolvedFont {
+export interface RwssResolvedFont {
   family: string
   path?: string
   style?: string
@@ -200,7 +200,7 @@ export interface VideoAssSubtitleOptions {
   subUrl?: string
   subContent?: string | Uint8Array | ArrayBuffer
   encryptedSubContent?: EncryptedSubtitleContent
-  fonts?: (string | Uint8Array | WrassFontSource)[]
+  fonts?: (string | Uint8Array | RwssFontSource)[]
   availableFonts?: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView>
   fallbackFonts?: string[]
   useLocalFonts?: boolean
@@ -212,7 +212,7 @@ export interface VideoAssSubtitleOptions {
   onLoaded?: () => void
   onError?: (error: Error) => void
   onCanvasFallback?: () => void
-  onEvent?: (event: WrassRendererEvent) => void
+  onEvent?: (event: RwssRendererEvent) => void
   renderAhead?: number
   fullTrackWarmup?: boolean
   /** Wait for fullTrackWarmup to finish before ready (default: false). */
@@ -254,8 +254,8 @@ export interface PerformanceStats {
   onDemandRender: boolean
 }
 
-export interface WrassRendererStatsSnapshot extends PerformanceStats {
-  backend: WrassRendererBackend
+export interface RwssRendererStatsSnapshot extends PerformanceStats {
+  backend: RwssRendererBackend
 }
 
 export type SubtitleColorSpace = 'BT601' | 'BT709' | 'SMPTE240M' | 'FCC' | null
@@ -423,11 +423,11 @@ export type ASSStyleCallback = (error: Error | null, styles: ASSStyle[]) => void
 export type PerformanceStatsCallback = (error: Error | null, stats: PerformanceStats | null) => void
 export type ResetStatsCallback = (error: Error | null) => void
 
-export type WrassRendererEvent =
+export type RwssRendererEvent =
   | { type: 'load-start' }
   | { type: 'load-complete'; metadata: AssMetadata }
   | { type: 'track-ready'; metadata: AssMetadata }
   | { type: 'partial-ready' }
-  | { type: 'render'; time: number; compositionCount: number; renderTime: number; bounds: AssCueBounds | null; backend: WrassRendererBackend; dropped: boolean }
+  | { type: 'render'; time: number; compositionCount: number; renderTime: number; bounds: AssCueBounds | null; backend: RwssRendererBackend; dropped: boolean }
   | { type: 'message'; target: string; data?: unknown }
   | { type: 'error'; error: Error }

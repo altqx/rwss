@@ -876,6 +876,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
+name = "rwss"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "rassa",
+ "rassa-fonts",
+ "rassa-shape",
+ "serde",
+ "serde-wasm-bindgen",
+ "ttf-parser",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1388,21 +1403,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d129932f4644ac2396cb456385cbf9e63b5b30c6e8dc4820bdca4eb082037a5"
 dependencies = [
  "winapi",
-]
-
-[[package]]
-name = "wrass"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "rassa",
- "rassa-fonts",
- "rassa-shape",
- "serde",
- "serde-wasm-bindgen",
- "ttf-parser",
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]

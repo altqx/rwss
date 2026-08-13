@@ -1,5 +1,5 @@
 /**
- * wrass - web browser ASS/SSA subtitle renderer powered by rassa.
+ * rwss - web browser ASS/SSA subtitle renderer powered by rassa.
  *
  * @packageDocumentation
  */
@@ -104,22 +104,22 @@ export type {
   VideoAssSubtitleOptions,
   VideoFrameCallbackMetadata,
   WebYCbCrColorSpace,
-  WrassFrameCropMode,
-  WrassPlaneData,
-  WrassRendererBackend,
-  WrassRendererEvent,
-  WrassRendererStatsSnapshot,
-  WrassFontSource,
-  WrassFontLoadOptions,
-  WrassAvailableFontLoadOptions,
-  WrassRegisteredFont,
-  WrassResolvedFont,
-  WrassImageCompositionResult,
+  RwssFrameCropMode,
+  RwssPlaneData,
+  RwssRendererBackend,
+  RwssRendererEvent,
+  RwssRendererStatsSnapshot,
+  RwssFontSource,
+  RwssFontLoadOptions,
+  RwssAvailableFontLoadOptions,
+  RwssRegisteredFont,
+  RwssResolvedFont,
+  RwssImageCompositionResult,
   AssRendererWorkerClientOptions,
   SerializableWorkerOptions,
-  WrassWorkerRequest,
-  WrassWorkerResponse,
-  WrassRawAesKey,
+  RwssWorkerRequest,
+  RwssWorkerResponse,
+  RwssRawAesKey,
   WorkerInitMessage,
   WorkerInboundMessage,
   WorkerOutboundMessage

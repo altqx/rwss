@@ -7,9 +7,9 @@ import type {
   PerformanceStats,
   VideoAssSubtitleOptions,
   VideoFrameCallbackMetadata,
-  WrassFontSource,
-  WrassRendererBackend,
-  WrassRendererStatsSnapshot
+  RwssFontSource,
+  RwssRendererBackend,
+  RwssRendererStatsSnapshot
 } from './types'
 import { MAX_FONT_BYTES, MAX_FRAME_PREFETCH } from './types'
 import { openAss, type AssParser } from './parsers'
@@ -91,10 +91,10 @@ export class AssRenderer extends EventTarget {
   private events: ASSEvent[] = []
   private styles: ASSStyle[] = []
   private styleOverridePatch: Partial<ASSStyle> | null = null
-  private readonly addedFonts: (string | Uint8Array | WrassFontSource)[] = []
+  private readonly addedFonts: (string | Uint8Array | RwssFontSource)[] = []
   private defaultFont = 'sans'
   private gpuRenderer: WebGPURenderer | WebGL2Renderer | null = null
-  private backend: WrassRendererBackend = 'canvas2d'
+  private backend: RwssRendererBackend = 'canvas2d'
   private frameTimeline: (Float64Array & { mediaTimeOrigin?: number; subtitleTimeOffset?: number }) | null = null
   private preparedFrames = new Map<number, PreparedFrame>()
   private prepareQueue: number[] = []
@@ -176,7 +176,7 @@ export class AssRenderer extends EventTarget {
     if (this.options.autoLoad !== false) void this.load()
   }
 
-  get rendererType(): WrassRendererBackend {
+  get rendererType(): RwssRendererBackend {
     return this.backend
   }
 
@@ -381,7 +381,7 @@ export class AssRenderer extends EventTarget {
     return this.effectiveStyles().map((style) => ({ ...style }))
   }
 
-  async addFont(font: string | Uint8Array | WrassFontSource, data?: Uint8Array | ArrayBuffer | ArrayBufferView): Promise<string | undefined> {
+  async addFont(font: string | Uint8Array | RwssFontSource, data?: Uint8Array | ArrayBuffer | ArrayBufferView): Promise<string | undefined> {
     const source = data && typeof font === 'string' ? { name: font, data } : font
     if (typeof source !== 'string' && !(source instanceof Uint8Array) && 'data' in source) {
       const bytes = source.data instanceof Uint8Array ? source.data : new Uint8Array(source.data instanceof ArrayBuffer ? source.data : source.data.buffer)
@@ -409,7 +409,7 @@ export class AssRenderer extends EventTarget {
     return this.buildStats()
   }
 
-  getStatsSnapshot(): WrassRendererStatsSnapshot {
+  getStatsSnapshot(): RwssRendererStatsSnapshot {
     return { ...this.buildStats(), backend: this.backend }
   }
 
@@ -435,7 +435,7 @@ export class AssRenderer extends EventTarget {
 
   async sendMessage(target: string, data?: unknown, _transferable?: Transferable[]): Promise<void> {
     this.emitEvent({ type: 'message', target, data })
-    if (this.debug) console.debug('[wrass]', target, data)
+    if (this.debug) console.debug('[rwss]', target, data)
   }
 
   renderCurrentTime(force = false): void {
@@ -629,7 +629,7 @@ export class AssRenderer extends EventTarget {
       }
       return true
     } catch (error) {
-      if (this.debug) console.warn('[wrass] present failed; preserving last subtitle frame', error)
+      if (this.debug) console.warn('[rwss] present failed; preserving last subtitle frame', error)
       return false
     }
   }
@@ -945,13 +945,13 @@ export class AssRenderer extends EventTarget {
 
   private createOverlayCanvas(video: HTMLVideoElement): HTMLCanvasElement {
     const canvas = document.createElement('canvas')
-    canvas.className = 'Wrass'
+    canvas.className = 'Rwss'
     canvas.style.position = 'absolute'
     canvas.style.display = 'block'
     canvas.style.pointerEvents = 'none'
     canvas.style.zIndex = '0'
     const parent = document.createElement('div')
-    parent.className = 'WrassContainer'
+    parent.className = 'RwssContainer'
     parent.style.position = 'relative'
     parent.style.zIndex = '1'
     parent.style.isolation = 'isolate'
@@ -999,7 +999,7 @@ export function createAssRenderer(options: VideoAssSubtitleOptions): AssRenderer
   return new AssRenderer(options)
 }
 
-function fontByteLength(font: string | Uint8Array | ArrayBuffer | ArrayBufferView | WrassFontSource): number {
+function fontByteLength(font: string | Uint8Array | ArrayBuffer | ArrayBufferView | RwssFontSource): number {
   if (typeof font === 'string') return 0
   if (font instanceof Uint8Array) return font.byteLength
   if (font instanceof ArrayBuffer) return font.byteLength

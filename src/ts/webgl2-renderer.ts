@@ -1,5 +1,5 @@
-import type { AssSubtitleData, RenderImage, WrassPlaneData } from './types'
-import { composeAssFrameCpu, limitAssImages, type WrassImageCompositionResult } from './gpu-compositor'
+import type { AssSubtitleData, RenderImage, RwssPlaneData } from './types'
+import { composeAssFrameCpu, limitAssImages, type RwssImageCompositionResult } from './gpu-compositor'
 
 export class WebGL2Renderer {
   readonly type = 'webgl2' as const
@@ -46,9 +46,9 @@ export class WebGL2Renderer {
     this.gl?.viewport(0, 0, width, height)
   }
 
-  render(data: AssSubtitleData): WrassImageCompositionResult
+  render(data: AssSubtitleData): RwssImageCompositionResult
   render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
-  render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): WrassImageCompositionResult | void {
+  render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): RwssImageCompositionResult | void {
     if (Array.isArray(dataOrImages)) {
       this.renderImages(dataOrImages, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
       return
@@ -95,7 +95,7 @@ export class WebGL2Renderer {
     void this.renderWithWebGL2(data)
   }
 
-  private renderWithWebGL2(data: AssSubtitleData): WrassImageCompositionResult {
+  private renderWithWebGL2(data: AssSubtitleData): RwssImageCompositionResult {
     const gl = this.gl
     if (!gl || !this.canvas) return composeAssFrameCpu(data, 'webgl2', true)
 
@@ -187,7 +187,7 @@ void main() {
     gl.vertexAttribPointer(this.texCoordLocation, 2, gl.FLOAT, false, 16, 8)
   }
 
-  private drawPlane(gl: WebGL2RenderingContext, frameWidth: number, frameHeight: number, plane: WrassPlaneData): void {
+  private drawPlane(gl: WebGL2RenderingContext, frameWidth: number, frameHeight: number, plane: RwssPlaneData): void {
     const texture = gl.createTexture()
     if (!texture) throw new Error('WebGL2 failed to allocate plane texture')
     gl.activeTexture(gl.TEXTURE0)
@@ -212,7 +212,7 @@ export function isWebGL2Supported(): boolean {
   return !!document.createElement('canvas').getContext('webgl2')
 }
 
-function renderImageToPlane(image: RenderImage): WrassPlaneData {
+function renderImageToPlane(image: RenderImage): RwssPlaneData {
   return {
     x: image.x,
     y: image.y,
@@ -258,7 +258,7 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
   return shader
 }
 
-function planeVertices(plane: WrassPlaneData, frameWidth: number, frameHeight: number): Float32Array {
+function planeVertices(plane: RwssPlaneData, frameWidth: number, frameHeight: number): Float32Array {
   const left = pixelXToClip(plane.x, frameWidth)
   const right = pixelXToClip(plane.x + plane.width, frameWidth)
   const top = pixelYToClip(plane.y, frameHeight)
@@ -281,7 +281,7 @@ function pixelYToClip(y: number, height: number): number {
   return height > 0 ? 1 - y / height * 2 : 1
 }
 
-function tightlyPackedPlaneRgba(plane: WrassPlaneData): Uint8Array {
+function tightlyPackedPlaneRgba(plane: RwssPlaneData): Uint8Array {
   const source = plane.rgba instanceof Uint8Array ? plane.rgba : new Uint8Array(plane.rgba)
   const strideBytes = plane.stride || plane.width * 4
   if (strideBytes === plane.width * 4 && source.byteLength >= plane.width * plane.height * 4) {

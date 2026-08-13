@@ -7,14 +7,14 @@ import {
   registerAvailableFonts,
   setFallbackFonts,
   resolveFont,
-  type WrassFontSource,
-  type WrassFontLoadOptions
+  type RwssFontSource,
+  type RwssFontLoadOptions
 } from '../src/index'
 
 const bytes = new Uint8Array([0, 1, 2, 3])
-const source: WrassFontSource = { data: bytes }
-const namedSource: WrassFontSource = { name: 'Liberation Sans', data: bytes, aliases: ['sans', 'sans-serif'], isFallback: true }
-const loadOptions: WrassFontLoadOptions = { aliases: ['Arial'], style: 'Regular', isFallback: false, timeoutMs: 1000 }
+const source: RwssFontSource = { data: bytes }
+const namedSource: RwssFontSource = { name: 'Liberation Sans', data: bytes, aliases: ['sans', 'sans-serif'], isFallback: true }
+const loadOptions: RwssFontLoadOptions = { aliases: ['Arial'], style: 'Regular', isFallback: false, timeoutMs: 1000 }
 
 const defaultAvailable: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView> = DEFAULT_AVAILABLE_FONTS
 const defaultFallback: string[] = DEFAULT_FALLBACK_FONTS

@@ -1,4 +1,4 @@
-//! # wrass
+//! # rwss
 //!
 //! Browser-friendly WASM facade for rendering ASS/SSA subtitles with rassa.
 
@@ -50,12 +50,12 @@ fn fallback_families() -> &'static Mutex<Vec<String>> {
     FALLBACK_FAMILIES.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-struct WrassFontProvider {
+struct RwssFontProvider {
     virtual_fonts: Vec<VirtualFontRecord>,
     system: FontconfigProvider,
 }
 
-impl WrassFontProvider {
+impl RwssFontProvider {
     fn new() -> Self {
         Self {
             virtual_fonts: virtual_fonts()
@@ -67,7 +67,7 @@ impl WrassFontProvider {
     }
 }
 
-impl FontProvider for WrassFontProvider {
+impl FontProvider for RwssFontProvider {
     fn resolve(&self, query: &FontQuery) -> FontMatch {
         let family_key = normalize_font_key(&query.family);
         let style_key = query.style.as_deref().map(normalize_font_key);
@@ -104,7 +104,7 @@ impl FontProvider for WrassFontProvider {
     }
 }
 
-impl WrassFontProvider {
+impl RwssFontProvider {
     fn resolve_configured_fallback(&self, query: &FontQuery) -> Option<FontMatch> {
         let fallback_keys = fallback_families()
             .lock()
@@ -215,7 +215,7 @@ fn register_font_inner(
     aliases.sort();
     aliases.dedup();
     let path = PathBuf::from(format!(
-        "/wrass-fontconfig/{:016x}-{}",
+        "/rwss-fontconfig/{:016x}-{}",
         stable_font_hash(&family, &bytes),
         sanitize_font_name(&family)
     ));
@@ -290,7 +290,7 @@ pub fn resolve_font(name: &str) -> Result<JsValue, JsValue> {
         provider: String,
     }
 
-    let provider = WrassFontProvider::new();
+    let provider = RwssFontProvider::new();
     let resolved = provider.resolve(&FontQuery::new(name));
     let data = FontMatchData {
         family: resolved.family,
@@ -590,7 +590,7 @@ pub fn detect_subtitle_format(name_or_text: &str) -> String {
 
 impl AssParser {
     fn render_at_ms(&self, now_ms: i64) -> Result<RenderedAssData, JsValue> {
-        let provider = WrassFontProvider::new();
+        let provider = RwssFontProvider::new();
         let frame = self
             .renderer
             .render_frame_with_provider(&self.script, &provider, now_ms)
@@ -812,7 +812,7 @@ fn js_error(error: impl std::fmt::Display) -> JsValue {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "[Script Info]\nPlayResX: 320\nPlayResY: 180\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,sans,24,&H00FFFFFF,&H0000FFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,wrass";
+    const SAMPLE: &str = "[Script Info]\nPlayResX: 320\nPlayResY: 180\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,sans,24,&H00FFFFFF,&H0000FFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,rwss";
 
     #[test]
     fn parses_metadata_and_events() {

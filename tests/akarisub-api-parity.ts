@@ -3,16 +3,16 @@ import DefaultExport, {
   AssRenderer,
   WebGPURenderer,
   WebGL2Renderer,
-  type WrassImageCompositionResult,
+  type RwssImageCompositionResult,
   registerFont,
   registerFontBytes,
   registerAvailableFonts,
   listRegisteredFonts,
   resolveFont,
   clearRegisteredFonts,
-  type WrassFontSource,
-  type WrassRegisteredFont,
-  type WrassResolvedFont,
+  type RwssFontSource,
+  type RwssRegisteredFont,
+  type RwssResolvedFont,
   computeCanvasSize,
   dropBlur,
   fixPlayRes,
@@ -24,7 +24,7 @@ import DefaultExport, {
   type EncryptedSubtitleContent,
   type PerformanceStats,
   type FrameTimeline,
-  type WrassRendererBackend
+  type RwssRendererBackend
 } from '../src/index'
 
 const video = document.createElement('video')
@@ -49,7 +49,7 @@ const options: VideoAssSubtitleOptions = {
   dropAllBlur: false,
   clampPos: false,
   workerUrl: '/worker.js',
-  wasmUrl: '/wrass_bg.wasm',
+  wasmUrl: '/rwss_bg.wasm',
   subContent: '[Script Info]\n',
   encryptedSubContent: encrypted,
   fonts: ['/font.ttf', new Uint8Array(), { name: 'DejaVu Sans', data: new Uint8Array(), aliases: ['Arial'] }],
@@ -75,7 +75,7 @@ const options: VideoAssSubtitleOptions = {
 const renderer = new AssRenderer(options)
 const rendererFromAlias = new AkariSub(options)
 const rendererFromDefault = new DefaultExport(options)
-const rendererType: WrassRendererBackend = renderer.rendererType
+const rendererType: RwssRendererBackend = renderer.rendererType
 const usingGpu: boolean = renderer.isUsingGPURenderer
 const usingWebGpu: boolean = renderer.isUsingWebGPU
 renderer.resize()
@@ -105,7 +105,7 @@ renderer.removeStyle(0)
 const stylesPromise: Promise<ASSStyle[]> = renderer.getStyles()
 renderer.addFont('/font.ttf')
 renderer.addFont(new Uint8Array())
-const fontSource: WrassFontSource = { name: 'DejaVu Sans', data: new Uint8Array(), aliases: ['Arial'] }
+const fontSource: RwssFontSource = { name: 'DejaVu Sans', data: new Uint8Array(), aliases: ['Arial'] }
 const addFontPromise: Promise<string | undefined> = renderer.addFont(fontSource)
 const addNamedFontPromise: Promise<string | undefined> = renderer.addFont('Arial', new Uint8Array())
 renderer.setDefaultFont('sans')
@@ -127,8 +127,8 @@ void eventCountPromise
 void styleCountPromise
 void addFontPromise
 void addNamedFontPromise
-const registeredFonts: WrassRegisteredFont[] = listRegisteredFonts()
-const resolvedFont: WrassResolvedFont | null = resolveFont('DejaVu Sans')
+const registeredFonts: RwssRegisteredFont[] = listRegisteredFonts()
+const resolvedFont: RwssResolvedFont | null = resolveFont('DejaVu Sans')
 const fontPathPromise: Promise<string | undefined> = registerFont(fontSource)
 const directFontPath: string = registerFontBytes('Arial', new Uint8Array(), { aliases: ['Liberation Sans'] })
 const registeredPathsPromise: Promise<string[]> = registerAvailableFonts({ 'DejaVu Sans': new Uint8Array() })
@@ -140,8 +140,8 @@ void directFontPath
 void registeredPathsPromise
 void rendererFromAlias
 void rendererFromDefault
-const gpuComposition: WrassImageCompositionResult = new WebGPURenderer(canvas).render({ width: 1, height: 1, compositionData: [] })
-const glComposition: WrassImageCompositionResult = new WebGL2Renderer(canvas).render({ width: 1, height: 1, compositionData: [] })
+const gpuComposition: RwssImageCompositionResult = new WebGPURenderer(canvas).render({ width: 1, height: 1, compositionData: [] })
+const glComposition: RwssImageCompositionResult = new WebGL2Renderer(canvas).render({ width: 1, height: 1, compositionData: [] })
 void gpuComposition
 void glComposition
 void computeCanvasSize(video)

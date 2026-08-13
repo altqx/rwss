@@ -1,19 +1,19 @@
 import { AssRenderer } from './renderers'
-import type { WrassWorkerRequest, WrassWorkerResponse } from './worker-client'
+import type { RwssWorkerRequest, RwssWorkerResponse } from './worker-client'
 
 let renderer: AssRenderer | undefined
 let currentCanvas: OffscreenCanvas | undefined
 
-self.addEventListener('message', (event: MessageEvent<WrassWorkerRequest>) => {
+self.addEventListener('message', (event: MessageEvent<RwssWorkerRequest>) => {
   void handleRequest(event.data)
 })
 
-async function handleRequest(request: WrassWorkerRequest): Promise<void> {
+async function handleRequest(request: RwssWorkerRequest): Promise<void> {
   try {
     switch (request.type) {
       case 'init': {
         currentCanvas = request.canvas
-        if (!currentCanvas) throw new Error('wrass worker init requires an OffscreenCanvas')
+        if (!currentCanvas) throw new Error('rwss worker init requires an OffscreenCanvas')
         renderer = new AssRenderer({
           ...request.options,
           canvas: currentCanvas as unknown as HTMLCanvasElement,
@@ -59,9 +59,9 @@ async function handleRequest(request: WrassWorkerRequest): Promise<void> {
 }
 
 function assertRenderer(): void {
-  if (!renderer) throw new Error('wrass worker renderer is not initialized')
+  if (!renderer) throw new Error('rwss worker renderer is not initialized')
 }
 
-function post(response: WrassWorkerResponse): void {
+function post(response: RwssWorkerResponse): void {
   self.postMessage(response)
 }

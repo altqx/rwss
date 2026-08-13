@@ -1,5 +1,5 @@
 {
-  "name": "wrass",
+  "name": "rwss",
   "version": "0.1.0",
   "exports": "./dist/index.js",
   "publish": {

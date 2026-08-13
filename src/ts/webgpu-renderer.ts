@@ -1,5 +1,5 @@
-import type { AssSubtitleData, RenderImage, WrassPlaneData } from './types'
-import { composeAssFrameCpu, limitAssImages, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
+import type { AssSubtitleData, RenderImage, RwssPlaneData } from './types'
+import { composeAssFrameCpu, limitAssImages, putCompositionOnCanvas, type RwssImageCompositionResult } from './gpu-compositor'
 
 export interface WebGPURendererOptions {
   device?: GPUDevice
@@ -53,9 +53,9 @@ export class WebGPURenderer {
     return this.initPromise
   }
 
-  render(data: AssSubtitleData): WrassImageCompositionResult
+  render(data: AssSubtitleData): RwssImageCompositionResult
   render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
-  render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): WrassImageCompositionResult | void {
+  render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): RwssImageCompositionResult | void {
     if (Array.isArray(dataOrImages)) {
       void this.renderImages(dataOrImages, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
       return
@@ -68,7 +68,7 @@ export class WebGPURenderer {
     return result
   }
 
-  async renderAsync(data: AssSubtitleData): Promise<WrassImageCompositionResult> {
+  async renderAsync(data: AssSubtitleData): Promise<RwssImageCompositionResult> {
     if (!await this.init()) return this.render(data)
 
     try {
@@ -145,7 +145,7 @@ export class WebGPURenderer {
     })
   }
 
-  private async renderWithWebGPU(data: AssSubtitleData): Promise<WrassImageCompositionResult> {
+  private async renderWithWebGPU(data: AssSubtitleData): Promise<RwssImageCompositionResult> {
     const device = this.device
     if (!device) return this.render(data)
 
@@ -177,7 +177,7 @@ export class WebGPURenderer {
     }
   }
 
-  private drawPlane(device: GPUDevice, encoder: GPUCommandEncoder, targetTexture: GPUTexture, frameWidth: number, frameHeight: number, plane: WrassPlaneData, clear: boolean): void {
+  private drawPlane(device: GPUDevice, encoder: GPUCommandEncoder, targetTexture: GPUTexture, frameWidth: number, frameHeight: number, plane: RwssPlaneData, clear: boolean): void {
     const state = this.ensurePipeline(device)
     const texture = device.createTexture({
       size: { width: plane.width, height: plane.height },
@@ -306,7 +306,7 @@ export function isWebGPUSupported(): boolean {
   return !!getNavigatorGpu()
 }
 
-function renderImageToPlane(image: RenderImage): WrassPlaneData {
+function renderImageToPlane(image: RenderImage): RwssPlaneData {
   return {
     x: image.x,
     y: image.y,
@@ -347,7 +347,7 @@ function getPreferredCanvasFormat(): GPUTextureFormat {
   return gpu?.getPreferredCanvasFormat?.() ?? 'rgba8unorm'
 }
 
-function planeVertices(plane: WrassPlaneData, frameWidth: number, frameHeight: number): Float32Array {
+function planeVertices(plane: RwssPlaneData, frameWidth: number, frameHeight: number): Float32Array {
   const left = pixelXToClip(plane.x, frameWidth)
   const right = pixelXToClip(plane.x + plane.width, frameWidth)
   const top = pixelYToClip(plane.y, frameHeight)
@@ -370,7 +370,7 @@ function pixelYToClip(y: number, height: number): number {
   return height > 0 ? 1 - y / height * 2 : 1
 }
 
-function paddedPlaneTextureData(plane: WrassPlaneData): { data: Uint8Array; bytesPerRow: number } {
+function paddedPlaneTextureData(plane: RwssPlaneData): { data: Uint8Array; bytesPerRow: number } {
   const source = plane.rgba instanceof Uint8Array ? plane.rgba : new Uint8Array(plane.rgba)
   const sourceStride = plane.stride || plane.width * 4
   const bytesPerRow = alignTo(plane.width * 4, 256)

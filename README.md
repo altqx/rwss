@@ -1,8 +1,8 @@
-# wrass
+# rwss
 
 High-performance browser ASS/SSA subtitle renderer powered by the pure-Rust [`rassa`](https://github.com/altqx/rassa) renderer and exported through WebAssembly.
 
-`wrass` follows the same browser package shape as [`libbitsub`](https://github.com/altqx/libbitsub): a Rust core, a generated `wasm-bindgen` package under `pkg/`, TypeScript wrappers under `src/ts/`, and public barrel exports from `src/index.ts` / `src/wrapper.ts`. It is intentionally modern-browser-first: WASM is the only subtitle engine path, the high-level video renderer uses `requestVideoFrameCallback`, and GPU helpers target WebGPU/WebGL2 with deterministic Canvas2D/CPU fallback where needed.
+`rwss` follows the same browser package shape as [`libbitsub`](https://github.com/altqx/libbitsub): a Rust core, a generated `wasm-bindgen` package under `pkg/`, TypeScript wrappers under `src/ts/`, and public barrel exports from `src/index.ts` / `src/wrapper.ts`. It is intentionally modern-browser-first: WASM is the only subtitle engine path, the high-level video renderer uses `requestVideoFrameCallback`, and GPU helpers target WebGPU/WebGL2 with deterministic Canvas2D/CPU fallback where needed.
 
 ## Features
 
@@ -27,14 +27,14 @@ High-performance browser ASS/SSA subtitle renderer powered by the pure-Rust [`ra
 ## Installation
 
 ```bash
-npm install wrass
+npm install rwss
 # or
-bun add wrass
+bun add rwss
 ```
 
 ## WASM setup
 
-In most bundler-based projects, no manual WASM setup is required. `wrass` resolves the generated WASM asset relative to the package module URL, so bundlers such as Vite, webpack, and Rollup can emit the asset automatically.
+In most bundler-based projects, no manual WASM setup is required. `rwss` resolves the generated WASM asset relative to the package module URL, so bundlers such as Vite, webpack, and Rollup can emit the asset automatically.
 
 The WASM module initializes automatically:
 
@@ -45,14 +45,14 @@ The WASM module initializes automatically:
 If your app serves package files in a way that does not expose the emitted WASM asset to the browser, copy the generated file to a public path and pass `wasmUrl`, or serve the package asset directly:
 
 ```bash
-mkdir -p public/wrass
-cp node_modules/wrass/pkg/wrass_bg.wasm public/wrass/
+mkdir -p public/rwss
+cp node_modules/rwss/pkg/rwss_bg.wasm public/rwss/
 ```
 
 ```ts
-import { initWasm } from 'wrass'
+import { initWasm } from 'rwss'
 
-await initWasm('/wrass/wrass_bg.wasm')
+await initWasm('/rwss/rwss_bg.wasm')
 ```
 
 ## Building from source
@@ -81,7 +81,7 @@ PATH="$HOME/.bun/bin:$PATH" bun run test
 The high-level renderer manages subtitle loading, canvas overlay creation, playback sync, browser font setup, and render timing:
 
 ```ts
-import { AssRenderer } from 'wrass'
+import { AssRenderer } from 'rwss'
 
 const renderer = new AssRenderer({
   video: videoElement,
@@ -102,7 +102,7 @@ renderer.destroy()
 If you already have subtitle text or bytes, pass `subContent` instead of `subUrl`:
 
 ```ts
-import { AssRenderer } from 'wrass'
+import { AssRenderer } from 'rwss'
 
 const renderer = new AssRenderer({
   video: videoElement,
@@ -113,16 +113,16 @@ const renderer = new AssRenderer({
 `AkariSub` is exported as an alias of `AssRenderer` for integrations that use an AkariSub-like entry point:
 
 ```ts
-import { AkariSub } from 'wrass'
+import { AkariSub } from 'rwss'
 
 const renderer = new AkariSub({ video: videoElement, subUrl: '/subtitles/movie.ass' })
 ```
 
 ### Exact-frame timing
 
-`wrass` sends rassa an integer millisecond timestamp. Fractional media times are floored after snapping only floating-point roundoff, matching libass's `Start <= now < Start + Duration` event boundaries. `timeOffset` and `renderAhead` are measured in seconds.
+`rwss` sends rassa an integer millisecond timestamp. Fractional media times are floored after snapping only floating-point roundoff, matching libass's `Start <= now < Start + Duration` event boundaries. `timeOffset` and `renderAhead` are measured in seconds.
 
-For frame-locked VOD playback, provide the encoded video's presentation timestamps. wrass prepares a small window of full subtitle frames and commits the matching frame inside `requestVideoFrameCallback`:
+For frame-locked VOD playback, provide the encoded video's presentation timestamps. rwss prepares a small window of full subtitle frames and commits the matching frame inside `requestVideoFrameCallback`:
 
 ```ts
 const frameTimeline = Object.assign(new Float64Array([0, 0.041708, 0.083417]), {
@@ -149,7 +149,7 @@ Custom canvases stay on the main thread by default. Set both `offscreenRender: t
 Use `openAss()` when you want in-memory parsing/rendering without a video element:
 
 ```ts
-import { openAss } from 'wrass'
+import { openAss } from 'rwss'
 
 const subtitles = await openAss(assText)
 
@@ -183,7 +183,7 @@ subtitles.dispose()
 Parser output can be flattened into exportable RGBA pixels for previews, editors, snapshots, or visual diffing:
 
 ```ts
-import { openAss, renderFrameData, toBlob, toCanvas, toImageBitmap } from 'wrass'
+import { openAss, renderFrameData, toBlob, toCanvas, toImageBitmap } from 'rwss'
 
 const subtitles = await openAss(assText)
 const subtitleFrame = subtitles.renderAtTimestamp(120.5)
@@ -214,10 +214,10 @@ Cropping modes:
 
 ## Fonts
 
-`wrass` registers browser-provided fonts into rassa's virtual font registry before opening a track.
+`rwss` registers browser-provided fonts into rassa's virtual font registry before opening a track.
 
 ```ts
-import { AssRenderer } from 'wrass'
+import { AssRenderer } from 'rwss'
 
 const renderer = new AssRenderer({
   video: videoElement,
@@ -234,14 +234,14 @@ await renderer.addFont('/fonts/Custom.ttf')
 renderer.setDefaultFont('Noto Sans CJK JP')
 ```
 
-Font inputs can be URLs, `Uint8Array`/`ArrayBuffer` bytes, or `WrassFontSource` objects with explicit `name`, `aliases`, `style`, and `isFallback` metadata.
+Font inputs can be URLs, `Uint8Array`/`ArrayBuffer` bytes, or `RwssFontSource` objects with explicit `name`, `aliases`, `style`, and `isFallback` metadata.
 
 ## Encrypted subtitle transport
 
-`wrass` can accept AES-GCM encrypted subtitle content where each chunk is IV-prefixed. Raw 128/192/256-bit key bytes or `CryptoKey` objects are accepted:
+`rwss` can accept AES-GCM encrypted subtitle content where each chunk is IV-prefixed. Raw 128/192/256-bit key bytes or `CryptoKey` objects are accepted:
 
 ```ts
-import { AssRenderer, createEncryptedSubtitleContent, importAesGcmKey } from 'wrass'
+import { AssRenderer, createEncryptedSubtitleContent, importAesGcmKey } from 'rwss'
 
 const key = await importAesGcmKey(rawKeyBytes)
 const encryptedSubContent = await createEncryptedSubtitleContent(assText, key)
@@ -270,7 +270,7 @@ renderer.createEvent({
   Start: 1.0,
   Duration: 2.5,
   Style: 'Default',
-  Text: 'Hello from wrass'
+  Text: 'Hello from rwss'
 })
 
 renderer.setEvent({ Text: 'Edited line' }, 0)
@@ -317,7 +317,7 @@ await renderer.resetStats()
 Video-managed overlays automatically pick WebGPU → WebGL2 → Canvas2D. Custom canvases stay on Canvas2D so callers can keep `getContext()` / pixel readback. For lower-level integrations, `WebGPURenderer` and `WebGL2Renderer` expose ASS image-plane composition surfaces:
 
 ```ts
-import { WebGPURenderer, WebGL2Renderer, isWebGPUSupported, isWebGL2Supported } from 'wrass'
+import { WebGPURenderer, WebGL2Renderer, isWebGPUSupported, isWebGL2Supported } from 'rwss'
 
 console.log({ webgpu: isWebGPUSupported(), webgl2: isWebGL2Supported() })
 
@@ -328,14 +328,14 @@ const gl = new WebGL2Renderer(canvas)
 gl.render(assSubtitleData)
 ```
 
-Both GPU helpers return or draw `WrassImageCompositionResult` data, and unsupported/headless environments fall back to deterministic CPU composition.
+Both GPU helpers return or draw `RwssImageCompositionResult` data, and unsupported/headless environments fall back to deterministic CPU composition.
 
 ## Worker/offscreen rendering
 
 `AssRendererWorkerClient` provides a worker protocol for OffscreenCanvas handoff:
 
 ```ts
-import { createAssRendererWorkerClient } from 'wrass'
+import { createAssRendererWorkerClient } from 'rwss'
 
 const client = createAssRendererWorkerClient({
   canvas: offscreenCanvas,
@@ -353,8 +353,8 @@ client.destroy()
 
 ## Notes
 
-- `wrass` handles ASS/SSA only. It does not parse bitmap subtitle formats such as PGS or VobSub; use `libbitsub` for those.
-- `wrass` uses WASM as the single subtitle engine path. There is no JavaScript renderer switch or HarfBuzz GPU glyph mode.
+- `rwss` handles ASS/SSA only. It does not parse bitmap subtitle formats such as PGS or VobSub; use `libbitsub` for those.
+- `rwss` uses WASM as the single subtitle engine path. There is no JavaScript renderer switch or HarfBuzz GPU glyph mode.
 - The default packaged fallback font is Liberation Sans (`src/default.woff2`). Configure additional fonts for CJK or custom-styled tracks.
 - The project tracks AkariSub browser orchestration from `altqx/akarisub` main after v0.2.2: exact-frame timelines, prefetch runways, adaptive timing, GPU fallback, and worker protocol surfaces.
 

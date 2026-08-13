@@ -1,11 +1,11 @@
 [package]
-name = "wrass"
+name = "rwss"
 version = "0.1.0"
 edition = "2024"
 authors = ["altqx"]
 license = "MIT"
 description = "Web browser ASS/SSA renderer wrapper around the pure-Rust rassa renderer"
-repository = "https://github.com/altqx/wrass"
+repository = "https://github.com/altqx/rwss"
 keywords = ["ass", "ssa", "subtitle", "wasm", "rassa"]
 
 [lib]

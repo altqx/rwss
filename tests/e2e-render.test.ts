@@ -10,11 +10,11 @@ import init, {
   registerFontData,
   resolveFont,
   setFallbackFonts
-} from '../pkg/wrass.js'
+} from '../pkg/rwss.js'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const ARTIFACT_DIR = join(ROOT, 'tests', 'artifacts')
-const WASM_PATH = join(ROOT, 'pkg', 'wrass_bg.wasm')
+const WASM_PATH = join(ROOT, 'pkg', 'rwss_bg.wasm')
 const FONT_CANDIDATES = [
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
   '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
@@ -34,9 +34,9 @@ Style: Default,Missing Browser Font,42,&H00FFFFFF,&H0000FFFF,&H00000000,&H800000
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0000,0000,0000,,{\\bord3\\shad1}wrass e2e render`
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0000,0000,0000,,{\\bord3\\shad1}rwss e2e render`
 
-describe('wrass browser/WASM rendering e2e', () => {
+describe('rwss browser/WASM rendering e2e', () => {
   test('renders ASS text through WASM + virtual fontconfig and writes a PNG artifact', async () => {
     const fontPath = await findUsableFont()
     const [wasmBytes, fontBytes] = await Promise.all([readFile(WASM_PATH), readFile(fontPath)])
@@ -51,7 +51,7 @@ describe('wrass browser/WASM rendering e2e', () => {
 
     const resolvedExact = resolveFont('Missing Browser Font')
     const resolvedFallback = resolveFont('Definitely Missing Family')
-    expect(virtualPath).toStartWith('/wrass-fontconfig/')
+    expect(virtualPath).toStartWith('/rwss-fontconfig/')
     expect(listRegisteredFonts().length).toBeGreaterThanOrEqual(1)
     expect(resolvedExact?.provider).toBe('Attached')
     expect(resolvedFallback?.provider).toBe('Attached')

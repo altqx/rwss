@@ -2,16 +2,16 @@ import type {
   AssFrameRenderOptions,
   AssRenderedFrameData,
   AssSubtitleData,
-  WrassFrameCropMode,
-  WrassPlaneData,
-  WrassFontSource,
-  WrassRegisteredFont,
-  WrassResolvedFont,
-  WrassFontLoadOptions,
-  WrassAvailableFontLoadOptions
+  RwssFrameCropMode,
+  RwssPlaneData,
+  RwssFontSource,
+  RwssRegisteredFont,
+  RwssResolvedFont,
+  RwssFontLoadOptions,
+  RwssAvailableFontLoadOptions
 } from './types'
 
-type WasmModule = typeof import('../../pkg/wrass')
+type WasmModule = typeof import('../../pkg/rwss')
 
 export const DEFAULT_FALLBACK_FONTS = ['liberation sans']
 export const DEFAULT_AVAILABLE_FONTS: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView> = {
@@ -30,7 +30,7 @@ export async function initWasm(input?: string | URL | Request): Promise<WasmModu
   wasmUrl = selectedWasmUrl
   wasmInitPromise = (async () => {
     try {
-      const mod = await import('../../pkg/wrass')
+      const mod = await import('../../pkg/rwss')
       const init = (mod as unknown as { default?: (input?: { module_or_path: string | URL | Request } | string | URL | Request) => Promise<unknown> }).default
       if (init) await (input === undefined ? init() : init({ module_or_path: selectedWasmUrl }))
       wasmModule = mod
@@ -49,7 +49,7 @@ export function isWasmInitialized(): boolean {
 
 export function getWasm(): WasmModule {
   if (!wasmModule) {
-    throw new Error('wrass WASM is not initialized. Call initWasm() first.')
+    throw new Error('rwss WASM is not initialized. Call initWasm() first.')
   }
   return wasmModule
 }
@@ -60,22 +60,22 @@ export function getWasmUrl(): string | URL | Request {
 
 function getDefaultWasmUrl(): string {
   try {
-    return new URL('../../pkg/wrass_bg.wasm', import.meta.url).href
+    return new URL('../../pkg/rwss_bg.wasm', import.meta.url).href
   } catch {
     if (typeof window !== 'undefined') {
-      return new URL('/wrass/wrass_bg.wasm', window.location.origin).href
+      return new URL('/rwss/rwss_bg.wasm', window.location.origin).href
     }
-    return '/wrass/wrass_bg.wasm'
+    return '/rwss/rwss_bg.wasm'
   }
 }
 
 if (typeof window !== 'undefined') {
   setTimeout(() => {
-    initWasm().catch((error) => console.warn('[wrass] WASM pre-init failed:', error))
+    initWasm().catch((error) => console.warn('[rwss] WASM pre-init failed:', error))
   }, 100)
 }
 
-export async function registerFont(font: WrassFontSource | string, data?: Uint8Array | ArrayBuffer | ArrayBufferView, options?: WrassFontLoadOptions): Promise<string | undefined> {
+export async function registerFont(font: RwssFontSource | string, data?: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): Promise<string | undefined> {
   await initWasm(wasmUrl)
   if (typeof font === 'string') {
     const bytes = data ? toUint8Array(data) : await fetchFontBytes(font, options?.timeoutMs)
@@ -85,7 +85,7 @@ export async function registerFont(font: WrassFontSource | string, data?: Uint8A
   return registerFontData(font.data, { ...font, ...options, aliases: dedupeAliases([...(font.aliases ?? []), ...(options?.aliases ?? [])]) })
 }
 
-export async function registerAvailableFonts(fonts?: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView>, options: WrassAvailableFontLoadOptions = {}): Promise<string[]> {
+export async function registerAvailableFonts(fonts?: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView>, options: RwssAvailableFontLoadOptions = {}): Promise<string[]> {
   if (!fonts) return []
   await initWasm(wasmUrl)
   if (options.fallbackFonts) setFallbackFonts(options.fallbackFonts)
@@ -104,15 +104,15 @@ export async function registerAvailableFonts(fonts?: Record<string, string | Uin
   return registered
 }
 
-export function registerFontBytes(name: string, data: Uint8Array | ArrayBuffer | ArrayBufferView, options?: WrassFontLoadOptions): string {
+export function registerFontBytes(name: string, data: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): string {
   const mod = getWasm() as WasmModule & { registerFont?: (name: string, bytes: Uint8Array, options?: unknown) => string }
-  if (!mod.registerFont) throw new Error('wrass WASM registerFont export is unavailable; rebuild pkg with wasm-pack')
+  if (!mod.registerFont) throw new Error('rwss WASM registerFont export is unavailable; rebuild pkg with wasm-pack')
   return mod.registerFont(name, toUint8Array(data), options)
 }
 
-export function registerFontData(data: Uint8Array | ArrayBuffer | ArrayBufferView, options?: WrassFontLoadOptions): string {
+export function registerFontData(data: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): string {
   const mod = getWasm() as WasmModule & { registerFontData?: (bytes: Uint8Array, options?: unknown) => string }
-  if (!mod.registerFontData) throw new Error('wrass WASM registerFontData export is unavailable; rebuild pkg with wasm-pack')
+  if (!mod.registerFontData) throw new Error('rwss WASM registerFontData export is unavailable; rebuild pkg with wasm-pack')
   return mod.registerFontData(toUint8Array(data), options)
 }
 
@@ -126,13 +126,13 @@ export function clearRegisteredFonts(): void {
   mod.clearRegisteredFonts?.()
 }
 
-export function listRegisteredFonts(): WrassRegisteredFont[] {
-  const mod = getWasm() as WasmModule & { listRegisteredFonts?: () => WrassRegisteredFont[] }
+export function listRegisteredFonts(): RwssRegisteredFont[] {
+  const mod = getWasm() as WasmModule & { listRegisteredFonts?: () => RwssRegisteredFont[] }
   return mod.listRegisteredFonts?.() ?? []
 }
 
-export function resolveFont(name: string): WrassResolvedFont | null {
-  const mod = getWasm() as WasmModule & { resolveFont?: (name: string) => WrassResolvedFont }
+export function resolveFont(name: string): RwssResolvedFont | null {
+  const mod = getWasm() as WasmModule & { resolveFont?: (name: string) => RwssResolvedFont }
   return mod.resolveFont?.(name) ?? null
 }
 
@@ -177,7 +177,7 @@ export function imageDataFromBytes(bytes: Uint8Array | number[], width: number, 
   return new ImageData(data, width, height)
 }
 
-export function planeToImageData(plane: WrassPlaneData): ImageData {
+export function planeToImageData(plane: RwssPlaneData): ImageData {
   return imageDataFromBytes(plane.rgba, plane.width, plane.height)
 }
 
@@ -188,7 +188,7 @@ export function normalizeFrameData(raw: Omit<AssRenderedFrameData, 'imageData'> 
   }
 }
 
-export function renderAssDataToFrame(data: AssSubtitleData, crop: WrassFrameCropMode = 'screen'): AssRenderedFrameData {
+export function renderAssDataToFrame(data: AssSubtitleData, crop: RwssFrameCropMode = 'screen'): AssRenderedFrameData {
   const bounds = getAssBounds(data.compositionData)
   const targetBounds = crop === 'bounds' && bounds ? bounds : { x: 0, y: 0, width: data.width, height: data.height }
   const imageData = new ImageData(targetBounds.width, targetBounds.height)
@@ -237,7 +237,7 @@ export async function toImageBitmap(frame: AssRenderedFrameData): Promise<ImageB
   return createImageBitmap(frame.imageData)
 }
 
-export function getAssBounds(planes: WrassPlaneData[]) {
+export function getAssBounds(planes: RwssPlaneData[]) {
   let xMin = Infinity
   let yMin = Infinity
   let xMax = -Infinity
@@ -257,7 +257,7 @@ function blendPlane(
   target: Uint8ClampedArray,
   targetWidth: number,
   targetHeight: number,
-  plane: WrassPlaneData,
+  plane: RwssPlaneData,
   offsetX: number,
   offsetY: number
 ): void {

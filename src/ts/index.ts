@@ -1,5 +1,5 @@
 /**
- * wrass TypeScript modules barrel export.
+ * rwss TypeScript modules barrel export.
  */
 
 export type {
@@ -28,16 +28,16 @@ export type {
   VideoAssSubtitleOptions,
   VideoFrameCallbackMetadata,
   WebYCbCrColorSpace,
-  WrassFrameCropMode,
-  WrassPlaneData,
-  WrassRendererBackend,
-  WrassRendererEvent,
-  WrassRendererStatsSnapshot,
-  WrassFontSource,
-  WrassFontLoadOptions,
-  WrassAvailableFontLoadOptions,
-  WrassRegisteredFont,
-  WrassResolvedFont,
+  RwssFrameCropMode,
+  RwssPlaneData,
+  RwssRendererBackend,
+  RwssRendererEvent,
+  RwssRendererStatsSnapshot,
+  RwssFontSource,
+  RwssFontLoadOptions,
+  RwssAvailableFontLoadOptions,
+  RwssRegisteredFont,
+  RwssResolvedFont,
   WorkerInitMessage,
   WorkerInboundMessage,
   WorkerOutboundMessage
@@ -64,15 +64,15 @@ export {
 } from './wasm'
 export { imageDataFromBytes, planeToImageData, renderFrameData, toBlob, toCanvas, toImageBitmap }
   from './wasm'
-export { composeAssFrameCpu, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
-export { createEncryptedSubtitleContent, decryptSubtitleContent, importAesGcmKey, type WrassRawAesKey } from './crypto'
+export { composeAssFrameCpu, putCompositionOnCanvas, type RwssImageCompositionResult } from './gpu-compositor'
+export { createEncryptedSubtitleContent, decryptSubtitleContent, importAesGcmKey, type RwssRawAesKey } from './crypto'
 export {
   AssRendererWorkerClient,
   createAssRendererWorkerClient,
   type AssRendererWorkerClientOptions,
   type SerializableWorkerOptions,
-  type WrassWorkerRequest,
-  type WrassWorkerResponse
+  type RwssWorkerRequest,
+  type RwssWorkerResponse
 } from './worker-client'
 export { AssParser, detectSubtitleFormat, normalizeError, openAss } from './parsers'
 export { AssRenderer, AssRenderer as AkariSub, createAssRenderer }

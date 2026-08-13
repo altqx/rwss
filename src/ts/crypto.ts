@@ -1,13 +1,13 @@
 import type { EncryptedSubtitleContent } from './types'
 
-export type WrassRawAesKey = Uint8Array | ArrayBuffer | ArrayBufferView
+export type RwssRawAesKey = Uint8Array | ArrayBuffer | ArrayBufferView
 
-export async function importAesGcmKey(key: CryptoKey | WrassRawAesKey): Promise<CryptoKey> {
+export async function importAesGcmKey(key: CryptoKey | RwssRawAesKey): Promise<CryptoKey> {
   if (isCryptoKey(key)) return key
   return crypto.subtle.importKey('raw', toArrayBuffer(key), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }
 
-export async function createEncryptedSubtitleContent(content: string | Uint8Array | ArrayBuffer, key: CryptoKey | WrassRawAesKey): Promise<EncryptedSubtitleContent> {
+export async function createEncryptedSubtitleContent(content: string | Uint8Array | ArrayBuffer, key: CryptoKey | RwssRawAesKey): Promise<EncryptedSubtitleContent> {
   const contentKey = await importAesGcmKey(key)
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const plain = typeof content === 'string' ? new TextEncoder().encode(content) : toUint8Array(content)
@@ -41,7 +41,7 @@ export async function decryptSubtitleContent(content: EncryptedSubtitleContent):
   return new TextDecoder().decode(joined)
 }
 
-function isCryptoKey(key: CryptoKey | WrassRawAesKey): key is CryptoKey {
+function isCryptoKey(key: CryptoKey | RwssRawAesKey): key is CryptoKey {
   return typeof CryptoKey !== 'undefined' && key instanceof CryptoKey
 }
 

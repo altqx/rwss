@@ -1,4 +1,4 @@
-import type { AssSubtitleData, WrassPlaneData } from './types'
+import type { AssSubtitleData, RwssPlaneData } from './types'
 import { MAX_RENDER_IMAGES, MAX_RENDER_PIXELS } from './types'
 
 export function limitAssImages<T extends { width?: number; height?: number; w?: number; h?: number }>(images: readonly T[]): T[] {
@@ -16,10 +16,10 @@ export function limitAssImages<T extends { width?: number; height?: number; w?: 
   return limited
 }
 
-export type WrassImageCompositionBackend = 'webgpu' | 'webgl2' | 'canvas2d'
+export type RwssImageCompositionBackend = 'webgpu' | 'webgl2' | 'canvas2d'
 
-export interface WrassImageCompositionResult {
-  backend: WrassImageCompositionBackend
+export interface RwssImageCompositionResult {
+  backend: RwssImageCompositionBackend
   width: number
   height: number
   rgba: Uint8Array
@@ -29,13 +29,13 @@ export interface WrassImageCompositionResult {
   usedFallback: boolean
 }
 
-export interface WrassImageCompositorOptions {
+export interface RwssImageCompositorOptions {
   canvas?: HTMLCanvasElement | OffscreenCanvas
-  backend: WrassImageCompositionBackend
+  backend: RwssImageCompositionBackend
   preferGpu?: boolean
 }
 
-export function composeAssFrameCpu(data: AssSubtitleData, backend: WrassImageCompositionBackend, usedFallback = true): WrassImageCompositionResult {
+export function composeAssFrameCpu(data: AssSubtitleData, backend: RwssImageCompositionBackend, usedFallback = true): RwssImageCompositionResult {
   const planes = limitAssImages(data.compositionData)
   const rgba = new Uint8Array(data.width * data.height * 4)
   for (const plane of planes) blendPlane(rgba, data.width, data.height, plane)
@@ -52,7 +52,7 @@ export function composeAssFrameCpu(data: AssSubtitleData, backend: WrassImageCom
   }
 }
 
-export function putCompositionOnCanvas(result: WrassImageCompositionResult, canvas?: HTMLCanvasElement | OffscreenCanvas): void {
+export function putCompositionOnCanvas(result: RwssImageCompositionResult, canvas?: HTMLCanvasElement | OffscreenCanvas): void {
   if (!canvas || typeof ImageData === 'undefined') return
   canvas.width = result.width
   canvas.height = result.height
@@ -61,7 +61,7 @@ export function putCompositionOnCanvas(result: WrassImageCompositionResult, canv
   ctx.putImageData(new ImageData(new Uint8ClampedArray(result.rgba), result.width, result.height), 0, 0)
 }
 
-function blendPlane(target: Uint8Array, targetWidth: number, targetHeight: number, plane: WrassPlaneData): void {
+function blendPlane(target: Uint8Array, targetWidth: number, targetHeight: number, plane: RwssPlaneData): void {
   const source = plane.rgba instanceof Uint8Array ? plane.rgba : new Uint8Array(plane.rgba)
   const stridePixels = Math.max(plane.width, Math.floor((plane.stride || plane.width * 4) / 4))
   for (let py = 0; py < plane.height; py++) {

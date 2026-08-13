@@ -1,7 +1,7 @@
 import type { ASSEvent, ASSStyle, AssSubtitleData, OpenedAssSubtitles, AssFrameRenderOptions, AssRenderedFrameData } from './types'
 import { getWasm, initWasm, normalizeFrameData, renderFrameData } from './wasm'
 
-type WasmAssParser = InstanceType<typeof import('../../pkg/wrass').AssParser>
+type WasmAssParser = InstanceType<typeof import('../../pkg/rwss').AssParser>
 
 export class AssParser implements OpenedAssSubtitles {
   readonly format = 'ass' as const

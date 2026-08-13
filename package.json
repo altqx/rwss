@@ -1,10 +1,11 @@
 {
-  "name": "wrass",
+  "name": "rwss",
   "version": "0.1.0",
   "author": "altqx",
   "license": "MIT",
   "description": "Web browser ASS/SSA renderer wrapper around rassa",
-  "keywords": ["wrass", "rassa", "ass", "ssa", "subtitle", "wasm", "rust", "rendering", "video"],
+  "repository": "https://github.com/altqx/rwss",
+  "keywords": ["rwss", "rassa", "ass", "ssa", "subtitle", "wasm", "rust", "rendering", "video"],
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,8 +16,8 @@
       "types": "./dist/index.d.ts"
     },
     "./pkg": {
-      "import": "./pkg/wrass.js",
-      "types": "./pkg/wrass.d.ts"
+      "import": "./pkg/rwss.js",
+      "types": "./pkg/rwss.d.ts"
     }
   },
   "files": ["dist", "pkg", "src/wrapper.ts", "src/default.woff2"],
