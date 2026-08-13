@@ -1,5 +1,5 @@
 import type { AssSubtitleData, RenderImage, WrassPlaneData } from './types'
-import { composeAssFrameCpu, type WrassImageCompositionResult } from './gpu-compositor'
+import { composeAssFrameCpu, limitAssImages, type WrassImageCompositionResult } from './gpu-compositor'
 
 export class WebGL2Renderer {
   readonly type = 'webgl2' as const
@@ -88,7 +88,7 @@ export class WebGL2Renderer {
     const data: AssSubtitleData = {
       width: canvasWidth,
       height: canvasHeight,
-      compositionData: images
+      compositionData: limitAssImages(images)
         .filter((image) => image.w > 0 && image.h > 0 && typeof image.image !== 'number')
         .map(renderImageToPlane)
     }
@@ -112,7 +112,8 @@ export class WebGL2Renderer {
     gl.bindVertexArray(this.vao)
     gl.uniform1i(this.textureLocation, 0)
 
-    for (const plane of data.compositionData) this.drawPlane(gl, data.width, data.height, plane)
+    const planes = limitAssImages(data.compositionData)
+    for (const plane of planes) this.drawPlane(gl, data.width, data.height, plane)
 
     const bottomLeft = new Uint8Array(data.width * data.height * 4)
     gl.readPixels(0, 0, data.width, data.height, gl.RGBA, gl.UNSIGNED_BYTE, bottomLeft)
@@ -123,7 +124,7 @@ export class WebGL2Renderer {
       width: data.width,
       height: data.height,
       rgba,
-      compositionCount: data.compositionData.length,
+      compositionCount: planes.length,
       nonTransparentPixels: coverage.nonTransparentPixels,
       alphaSum: coverage.alphaSum,
       usedFallback: false

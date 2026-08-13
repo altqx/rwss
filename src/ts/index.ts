@@ -13,15 +13,20 @@ export type {
   ASSEventCallback,
   ASSStyle,
   ASSStyleCallback,
+  AkariSubOptions,
   EncryptedSubtitleContent,
+  FrameTimeline,
   OpenedAssSubtitles,
   PerformanceStats,
   PerformanceStatsCallback,
+  RawASSImage,
   RenderImage,
+  RenderMessage,
   RenderTimes,
   ResetStatsCallback,
   SubtitleColorSpace,
   VideoAssSubtitleOptions,
+  VideoFrameCallbackMetadata,
   WebYCbCrColorSpace,
   WrassFrameCropMode,
   WrassPlaneData,
@@ -36,6 +41,12 @@ export type {
   WorkerInitMessage,
   WorkerInboundMessage,
   WorkerOutboundMessage
+} from './types'
+export {
+  MAX_FONT_BYTES,
+  MAX_FRAME_PREFETCH,
+  MAX_RENDER_IMAGES,
+  MAX_RENDER_PIXELS
 } from './types'
 
 export { initWasm, isWasmInitialized, getWasm, getWasmUrl } from './wasm'
@@ -85,3 +96,22 @@ export {
 } from './utils'
 export { WebGPURenderer, isWebGPUSupported, type WebGPURendererOptions } from './webgpu-renderer'
 export { WebGL2Renderer, isWebGL2Supported } from './webgl2-renderer'
+export {
+  compensatedMediaTime,
+  compositorScheduleLeadMs,
+  estimateRefreshIntervalMs,
+  frameIndexAtOrAfter,
+  isStalePresentation,
+  nearestFrameIndex,
+  normalizeFrameTimeline,
+  presentationLeadSeconds,
+  predictFrameDisplayTimeMs,
+  presentedFrameIndex,
+  resolvePresentationMediaTime,
+  secondsToAssMs,
+  selectRenderMediaTime,
+  snapToFrameTimeline,
+  snapToSubtitleTimeline,
+  subtitleTimeForFrame,
+  updateTimingCompensation
+} from './timing'

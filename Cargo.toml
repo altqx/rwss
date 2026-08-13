@@ -19,13 +19,13 @@ rassa = "0.6.0"
 rassa-fonts = "0.6.0"
 rassa-shape = "0.6.0"
 ttf-parser = "0.25"
-wasm-bindgen = "0.2.122"
+wasm-bindgen = "0.2.127"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.72"
+wasm-bindgen-test = "0.3.77"
 
 [profile.release]
 opt-level = "z"

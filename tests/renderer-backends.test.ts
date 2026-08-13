@@ -82,4 +82,17 @@ describe('modern browser scheduling', () => {
     expect(cancelled).toBe(42)
     renderer.destroy()
   })
+
+  test('custom canvases stay on the main-thread Canvas2D path by default', () => {
+    const canvas = {
+      width: 16,
+      height: 9,
+      getContext: () => ({ clearRect() {}, drawImage() {} }),
+      style: {}
+    } as unknown as HTMLCanvasElement
+    const renderer = new AssRenderer({ canvas, subContent: '[Script Info]\n', autoLoad: false })
+    expect(renderer.rendererType).toBe('canvas2d')
+    expect(renderer.isUsingGPURenderer).toBe(false)
+    renderer.destroy()
+  })
 })

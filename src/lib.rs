@@ -530,7 +530,7 @@ impl AssParser {
 
     #[wasm_bindgen(js_name = renderAtTimestamp)]
     pub fn render_at_timestamp_js(&self, time_seconds: f64) -> Result<JsValue, JsValue> {
-        to_js(&self.render_at_ms((time_seconds * 1000.0).round() as i64)?)
+        to_js(&self.render_at_ms(seconds_to_ass_ms(time_seconds))?)
     }
 
     #[wasm_bindgen(js_name = renderAtIndex)]
@@ -546,7 +546,7 @@ impl AssParser {
 
     #[wasm_bindgen(js_name = renderFrameDataAtTimestamp)]
     pub fn render_frame_data_at_timestamp_js(&self, time_seconds: f64) -> Result<JsValue, JsValue> {
-        to_js(&self.render_frame_at_ms((time_seconds * 1000.0).round() as i64)?)
+        to_js(&self.render_frame_at_ms(seconds_to_ass_ms(time_seconds))?)
     }
 
     #[wasm_bindgen(js_name = renderFrameDataAtIndex)]
@@ -778,6 +778,28 @@ fn blend_plane(target: &mut [u8], target_width: i32, target_height: i32, plane: 
     }
 }
 
+fn seconds_to_ass_ms(seconds: f64) -> i64 {
+    if !seconds.is_finite() {
+        return 0;
+    }
+
+    let raw_milliseconds = seconds * 1000.0;
+    let nearest_millisecond = raw_milliseconds.round();
+    let magnitude = if raw_milliseconds.abs() > 1.0 {
+        raw_milliseconds.abs()
+    } else {
+        1.0
+    };
+    let round_off_tolerance = magnitude * f64::EPSILON * 4.0;
+    let milliseconds = if (raw_milliseconds - nearest_millisecond).abs() <= round_off_tolerance {
+        nearest_millisecond
+    } else {
+        raw_milliseconds.floor()
+    };
+
+    milliseconds.clamp(i64::MIN as f64, i64::MAX as f64) as i64
+}
+
 fn to_js<T: Serialize + ?Sized>(value: &T) -> Result<JsValue, JsValue> {
     serde_wasm_bindgen::to_value(value).map_err(js_error)
 }
@@ -810,5 +832,14 @@ mod tests {
         assert_eq!(frame.screen_width, 320);
         assert_eq!(frame.screen_height, 180);
         assert_eq!(frame.image_data.len(), 320 * 180 * 4);
+    }
+
+    #[test]
+    fn preserves_exact_integer_milliseconds() {
+        assert_eq!(seconds_to_ass_ms(1.001), 1001);
+        assert_eq!(seconds_to_ass_ms(8.008), 8008);
+        assert_eq!(seconds_to_ass_ms(0.0), 0);
+        assert_eq!(seconds_to_ass_ms(1.0015), 1001);
+        assert_eq!(seconds_to_ass_ms(f64::NAN), 0);
     }
 }

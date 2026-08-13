@@ -15,9 +15,14 @@ High-performance browser ASS/SSA subtitle renderer powered by the pure-Rust [`ra
 - Browser font loading via configured font URLs/bytes and optional `queryLocalFonts`
 - Frame export helpers for `ImageData`, `ImageBitmap`, `Blob`, and canvas targets
 - WebGPU and WebGL2 image-composition surfaces for ASS planes, with CPU fallback for unsupported/headless runtimes
-- Worker/offscreen client/runtime protocol for OffscreenCanvas rendering handoff
+- Exact-frame `requestVideoFrameCallback` sampling with encoded `frameTimeline` maps, HLS/Shaka clock-domain detection, and integer-millisecond rassa timestamps
+- Exact-frame prefetch runway (`framePrefetch`, default 2, max 24) that can defer `ready` / `trackReady` until the current frame and runway are prepared
+- Adaptive presentation-latency compensation, compositor refresh-grid reanchoring, and immediate prepared-frame commit on RVFC arrival
+- Custom canvases stay on the main thread by default; worker/raw ASS WebGL2 composition is an explicit opt-in
+- Safety limits for fonts (32 MiB) and composed image planes (8192 images / 32M pixels)
+- Worker/offscreen client/runtime protocol for OffscreenCanvas rendering handoff, including prepare/present/frame-timeline messages
 - AES-GCM encrypted subtitle content transport with raw-key helpers for Akari-style handoff
-- TypeScript support with exported renderer, worker, metadata, event, style, and frame types
+- TypeScript support with exported renderer, worker, metadata, event, style, timing, and frame types
 
 ## Installation
 
@@ -112,6 +117,32 @@ import { AkariSub } from 'wrass'
 
 const renderer = new AkariSub({ video: videoElement, subUrl: '/subtitles/movie.ass' })
 ```
+
+### Exact-frame timing
+
+`wrass` sends rassa an integer millisecond timestamp. Fractional media times are floored after snapping only floating-point roundoff, matching libass's `Start <= now < Start + Duration` event boundaries. `timeOffset` and `renderAhead` are measured in seconds.
+
+For frame-locked VOD playback, provide the encoded video's presentation timestamps. wrass prepares a small window of full subtitle frames and commits the matching frame inside `requestVideoFrameCallback`:
+
+```ts
+const frameTimeline = Object.assign(new Float64Array([0, 0.041708, 0.083417]), {
+  mediaTimeOrigin: 0,
+  subtitleTimeOffset: 0
+})
+
+const renderer = new AssRenderer({
+  video: videoElement,
+  subContent,
+  frameTimeline,
+  framePrefetch: 2,
+  adaptiveTiming: true
+})
+
+renderer.setFrameTimeline(frameTimeline)
+renderer.setFrameTimeline(null) // return to continuous-time rendering
+```
+
+Custom canvases stay on the main thread by default. Set both `offscreenRender: true` and `rawAssImageGpu: true` to opt into worker/raw-plane WebGL2 composition when dense overlays benefit from it.
 
 ## Low-level parser API
 
@@ -277,11 +308,13 @@ console.log(renderer.getStatsSnapshot())
 await renderer.resetStats()
 ```
 
-`PerformanceStats` includes frame counts, render timing, render FPS, cache counters, and worker/offscreen/on-demand flags.
+`PerformanceStats` includes frame counts, render timing, learned `timingCompensationMs`, last image counts, render FPS, cache counters, and worker/offscreen/on-demand flags.
+
+`AssRenderer` also implements `EventTarget`, so AkariSub-style `ready`, `trackReady`, `partial_ready`, and `error` events are available alongside `onEvent`.
 
 ## GPU composition helpers
 
-The high-level `AssRenderer` currently draws flattened frames through Canvas2D for the video overlay. For lower-level integrations, `WebGPURenderer` and `WebGL2Renderer` expose ASS image-plane composition surfaces:
+Video-managed overlays automatically pick WebGPU → WebGL2 → Canvas2D. Custom canvases stay on Canvas2D so callers can keep `getContext()` / pixel readback. For lower-level integrations, `WebGPURenderer` and `WebGL2Renderer` expose ASS image-plane composition surfaces:
 
 ```ts
 import { WebGPURenderer, WebGL2Renderer, isWebGPUSupported, isWebGL2Supported } from 'wrass'
@@ -313,9 +346,9 @@ const client = createAssRendererWorkerClient({
   onEvent: (event) => console.log(event)
 })
 
-await client.whenReady()
-await client.setCurrentTime(videoElement.currentTime)
-await client.dispose()
+await client.ready
+await client.renderAt(videoElement.currentTime)
+client.destroy()
 ```
 
 ## Notes
@@ -323,7 +356,7 @@ await client.dispose()
 - `wrass` handles ASS/SSA only. It does not parse bitmap subtitle formats such as PGS or VobSub; use `libbitsub` for those.
 - `wrass` uses WASM as the single subtitle engine path. There is no JavaScript renderer switch or HarfBuzz GPU glyph mode.
 - The default packaged fallback font is Liberation Sans (`src/default.woff2`). Configure additional fonts for CJK or custom-styled tracks.
-- The project tracks AkariSub-like browser ergonomics where useful, but experimental AkariSub-only surfaces are intentionally not exposed.
+- The project tracks AkariSub browser orchestration from `altqx/akarisub` main after v0.2.2: exact-frame timelines, prefetch runways, adaptive timing, GPU fallback, and worker protocol surfaces.
 
 ## API Reference
 
@@ -348,9 +381,11 @@ await client.dispose()
 - `load(): Promise<void>` loads the configured subtitle input.
 - `start(): void` starts the render loop.
 - `stop(): void` stops the render loop.
-- `resize(width?, height?): void` resizes the overlay canvas.
+- `resize(width?, height?, top?, left?, force?): void` resizes the overlay canvas.
 - `setVideo(video): void` updates the backing video element.
+- `setFrameTimeline(frameTimes): void` replaces or disables the encoded-frame timeline.
 - `setTrackByUrl(url): void`, `setTrack(content): void`, `setEncryptedTrack(content): void`, and `freeTrack(): void` manage subtitle tracks.
+- `rendererType`, `isUsingGPURenderer`, `framePrefetch`, `renderAhead`, and `timeOffset` expose live renderer state.
 - `setCurrentTime(isPaused?, currentTime?, rate?): void`, `setIsPaused(isPaused): void`, and `setRate(rate): void` control manual playback state.
 - `createEvent(event)`, `setEvent(event, index)`, `removeEvent(index)`, and `getEvents()` edit/read events.
 - `createStyle(style)`, `setStyle(style, index)`, `removeStyle(index)`, `getStyles()`, `styleOverride(style)`, and `disableStyleOverride()` edit/read styles.

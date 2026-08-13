@@ -16,8 +16,15 @@ export interface AssMetadata {
   language: string
 }
 
+export const MAX_FONT_BYTES = 32 * 1024 * 1024
+export const MAX_RENDER_IMAGES = 8192
+export const MAX_RENDER_PIXELS = 32 * 1024 * 1024
+export const MAX_FRAME_PREFETCH = 24
+
 export interface ASSEvent {
+  /** Start time in seconds. */
   Start: number
+  /** Duration in seconds. */
   Duration: number
   Style: string
   Name: string
@@ -28,6 +35,7 @@ export interface ASSEvent {
   Text: string
   ReadOrder: number
   Layer: number
+  _index?: number
 }
 
 export interface ASSStyle {
@@ -153,12 +161,31 @@ export interface WrassResolvedFont {
   provider: string
 }
 
+/** Encoded-frame timestamps with optional media/subtitle clock offsets. */
+export interface FrameTimeline extends ArrayLike<number> {
+  mediaTimeOrigin?: number
+  subtitleTimeOffset?: number
+}
+
 export interface VideoAssSubtitleOptions {
   video?: HTMLVideoElement
   canvas?: HTMLCanvasElement
+  /** Image blending mode: 'js' for hardware acceleration, 'wasm' for software. */
+  blendMode?: 'js' | 'wasm'
+  /** Use async rendering with ImageBitmap (default: true on Canvas2D paths). */
   asyncRender?: boolean
+  /** Use offscreen canvas rendering (default: true for video-managed canvases, false for custom canvases). */
   offscreenRender?: boolean
+  /** Compose raw ASS image planes with WebGL2 (default: false; custom canvases stay main-thread). */
+  rawAssImageGpu?: boolean
+  /** Use requestVideoFrameCallback for precise sync (default: true). */
   onDemandRender?: boolean
+  /** Compensate measured render/presentation latency while playing (default: true). */
+  adaptiveTiming?: boolean
+  /** Encoded video-frame timestamps and optional RVFC media-time origin, in seconds. */
+  frameTimeline?: FrameTimeline
+  /** Number of exact subtitle frames to prepare ahead (default: 2, maximum 24). */
+  framePrefetch?: number
   targetFps?: number
   timeOffset?: number
   debug?: boolean
@@ -177,6 +204,8 @@ export interface VideoAssSubtitleOptions {
   availableFonts?: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView>
   fallbackFonts?: string[]
   useLocalFonts?: boolean
+  /** Use the virtual fontconfig provider for packaged font lookup (default: true). */
+  useFontconfigProvider?: boolean
   libassMemoryLimit?: number
   libassGlyphLimit?: number
   onLoading?: () => void
@@ -186,9 +215,18 @@ export interface VideoAssSubtitleOptions {
   onEvent?: (event: WrassRendererEvent) => void
   renderAhead?: number
   fullTrackWarmup?: boolean
+  /** Wait for fullTrackWarmup to finish before ready (default: false). */
+  blockingFullTrackWarmup?: boolean
+  /** Step in seconds for fullTrackWarmup (default: 1). */
+  fullTrackWarmupStep?: number
+  /** Allow adaptive CPU preblend layouts for text-heavy frames (default: false). */
+  adaptiveBlendLayouts?: boolean
   /** Internal/advanced: set false when a worker runtime wants to await load() explicitly. */
   autoLoad?: boolean
 }
+
+/** @deprecated Use VideoAssSubtitleOptions. */
+export type AkariSubOptions = VideoAssSubtitleOptions
 
 export interface PerformanceStats {
   framesRendered: number
@@ -197,12 +235,21 @@ export interface PerformanceStats {
   maxRenderTime: number
   minRenderTime: number
   lastRenderTime: number
+  /** Current automatically learned presentation-latency compensation in milliseconds. */
+  timingCompensationMs?: number
+  /** Number of image planes emitted by the last render. */
+  lastImageCount?: number
+  /** Total RGBA/raw image pixels emitted by the last render. */
+  lastImagePixels?: number
   pendingRenders: number
   totalEvents: number
   cacheHits: number
   cacheMisses: number
   renderFps: number
   usingWorker: boolean
+  /** Whether raw ASS_Image GPU composition is active. */
+  rawAssImageGpu?: boolean
+  workerRenderer?: 'webgl2-raw-ass' | 'canvas2d' | 'hybrid' | 'main-thread'
   offscreenRender: boolean
   onDemandRender: boolean
 }
@@ -222,6 +269,41 @@ export interface RenderImage {
   image: ImageBitmap | ArrayBuffer | Uint8Array | Uint8ClampedArray | number
 }
 
+/** Raw ASS_Image plane for GPU mask composition. */
+export interface RawASSImage {
+  dst_x: number
+  dst_y: number
+  w: number
+  h: number
+  bitmap: number
+  color: number
+  stride: number
+  type: number
+}
+
+export interface VideoFrameCallbackMetadata {
+  mediaTime: number
+  width: number
+  height: number
+  presentedFrames?: number
+  processingDuration?: number
+  expectedDisplayTime?: number
+  presentationTime?: number
+}
+
+export interface RenderMessage {
+  target: 'render'
+  asyncRender?: boolean
+  images: RenderImage[]
+  times: RenderTimes
+  width: number
+  height: number
+  colorSpace: string | null
+  requestId?: number
+  renderEpoch?: number
+  presentationId?: number
+}
+
 export interface RenderTimes {
   WASMRenderTime?: number
   WASMBitmapDecodeTime?: number
@@ -234,7 +316,8 @@ export interface RenderTimes {
 export type WorkerOutboundMessage =
   | { target: 'ready' }
   | { target: 'trackReady' }
-  | { target: 'unbusy' }
+  | { target: 'partial_ready' }
+  | { target: 'unbusy'; requestId?: number; renderEpoch?: number; presentationId?: number; painted?: boolean }
   | { target: 'console'; command: string; content: string }
   | { target: 'getLocalFont'; font: string }
   | { target: 'verifyColorSpace'; subtitleColorSpace: string | null }
@@ -244,17 +327,27 @@ export type WorkerOutboundMessage =
   | { target: 'resetStats'; success: boolean }
   | { target: 'getEventCount'; count: number }
   | { target: 'getStyleCount'; count: number }
-  | { target: 'render'; images: RenderImage[]; times: RenderTimes; width: number; height: number; colorSpace: string | null }
+  | { target: 'prepared'; prepareId: number; renderEpoch: number; time: number; width: number; height: number; bitmap?: ImageBitmap }
+  | { target: 'presented'; presentationId: number; renderEpoch?: number; frameIndex?: number }
+  | RenderMessage
 
 export interface WorkerInitMessage {
   target: 'init'
   wasmUrl: string
   asyncRender: boolean
   fullTrackWarmup: boolean
+  blockingFullTrackWarmup?: boolean
+  fullTrackWarmupStep?: number
+  adaptiveBlendLayouts?: boolean
+  rawAssImageGpu?: boolean
   onDemandRender: boolean
   initialTime: number
+  initialIsPaused?: boolean
+  initialPlaybackRate?: number
+  initialTimeSnapshotAtMs?: number
   width: number
   height: number
+  blendMode?: 'js' | 'wasm'
   subUrl?: string
   subContent?: string | Uint8Array | ArrayBuffer | null
   encryptedSubContent?: EncryptedSubtitleContent | null
@@ -263,26 +356,48 @@ export interface WorkerInitMessage {
   fallbackFonts: string[]
   debug: boolean
   targetFps: number
+  renderAhead?: number
+  adaptiveTiming?: boolean
+  frameTimelineMode?: boolean
   dropAllAnimations?: boolean
   dropAllBlur?: boolean
   clampPos?: boolean
   libassMemoryLimit?: number
   libassGlyphLimit?: number
   useLocalFonts: boolean
+  useFontconfigProvider?: boolean
   hasBitmapBug: boolean
 }
 
 export type WorkerInboundMessage =
   | WorkerInitMessage
-  | { target: 'offscreenCanvas'; transferable: [OffscreenCanvas] }
+  | { target: 'offscreenCanvas'; rawAssImageGpu?: boolean; transferable: [OffscreenCanvas] }
   | { target: 'detachOffscreen' }
   | { target: 'canvas'; width: number; height: number; videoWidth: number; videoHeight: number; force?: boolean }
-  | { target: 'video'; currentTime?: number; isPaused?: boolean; rate?: number; colorSpace?: string | null }
+  | {
+      target: 'video'
+      currentTime?: number
+      isPaused?: boolean
+      rate?: number
+      renderAhead?: number
+      colorSpace?: string | null
+    }
   | { target: 'setTrack'; content: string | Uint8Array | ArrayBuffer }
   | { target: 'setEncryptedTrack'; content: EncryptedSubtitleContent }
   | { target: 'setTrackByUrl'; url: string }
   | { target: 'freeTrack' }
-  | { target: 'demand'; time: number }
+  | {
+      target: 'demand'
+      time: number
+      force?: boolean
+      requestId?: number
+      renderEpoch?: number
+      presentationId?: number
+    }
+  | { target: 'prepare'; time: number; prepareId: number; renderEpoch: number; force?: boolean }
+  | { target: 'presentation'; presentationId: number }
+  | { target: 'presentFrame'; bitmap: ImageBitmap; presentationId: number }
+  | { target: 'frameTimelineMode'; enabled: boolean }
   | { target: 'destroy' }
   | { target: 'addFont'; font: string | Uint8Array }
   | { target: 'defaultFont'; font: string }
@@ -312,6 +427,7 @@ export type WrassRendererEvent =
   | { type: 'load-start' }
   | { type: 'load-complete'; metadata: AssMetadata }
   | { type: 'track-ready'; metadata: AssMetadata }
+  | { type: 'partial-ready' }
   | { type: 'render'; time: number; compositionCount: number; renderTime: number; bounds: AssCueBounds | null; backend: WrassRendererBackend; dropped: boolean }
   | { type: 'message'; target: string; data?: unknown }
   | { type: 'error'; error: Error }

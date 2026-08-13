@@ -1,5 +1,5 @@
 import type { AssSubtitleData, RenderImage, WrassPlaneData } from './types'
-import { composeAssFrameCpu, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
+import { composeAssFrameCpu, limitAssImages, putCompositionOnCanvas, type WrassImageCompositionResult } from './gpu-compositor'
 
 export interface WebGPURendererOptions {
   device?: GPUDevice
@@ -117,7 +117,7 @@ export class WebGPURenderer {
     const data: AssSubtitleData = {
       width: canvasWidth,
       height: canvasHeight,
-      compositionData: images
+      compositionData: limitAssImages(images)
         .filter((image) => image.w > 0 && image.h > 0 && typeof image.image !== 'number')
         .map(renderImageToPlane)
     }
@@ -156,7 +156,8 @@ export class WebGPURenderer {
     })
 
     const encoder = device.createCommandEncoder()
-    data.compositionData.forEach((plane, index) => {
+    const planes = limitAssImages(data.compositionData)
+    planes.forEach((plane, index) => {
       this.drawPlane(device, encoder, targetTexture, data.width, data.height, plane, index === 0)
     })
 
@@ -169,7 +170,7 @@ export class WebGPURenderer {
       width: data.width,
       height: data.height,
       rgba,
-      compositionCount: data.compositionData.length,
+      compositionCount: planes.length,
       nonTransparentPixels: coverage.nonTransparentPixels,
       alphaSum: coverage.alphaSum,
       usedFallback: false

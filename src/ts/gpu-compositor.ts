@@ -1,4 +1,20 @@
 import type { AssSubtitleData, WrassPlaneData } from './types'
+import { MAX_RENDER_IMAGES, MAX_RENDER_PIXELS } from './types'
+
+export function limitAssImages<T extends { width?: number; height?: number; w?: number; h?: number }>(images: readonly T[]): T[] {
+  const limited: T[] = []
+  let pixels = 0
+  for (const image of images) {
+    if (limited.length >= MAX_RENDER_IMAGES) break
+    const width = image.width ?? image.w ?? 0
+    const height = image.height ?? image.h ?? 0
+    const nextPixels = Math.max(0, width) * Math.max(0, height)
+    if (pixels + nextPixels > MAX_RENDER_PIXELS) break
+    pixels += nextPixels
+    limited.push(image)
+  }
+  return limited
+}
 
 export type WrassImageCompositionBackend = 'webgpu' | 'webgl2' | 'canvas2d'
 
@@ -20,15 +36,16 @@ export interface WrassImageCompositorOptions {
 }
 
 export function composeAssFrameCpu(data: AssSubtitleData, backend: WrassImageCompositionBackend, usedFallback = true): WrassImageCompositionResult {
+  const planes = limitAssImages(data.compositionData)
   const rgba = new Uint8Array(data.width * data.height * 4)
-  for (const plane of data.compositionData) blendPlane(rgba, data.width, data.height, plane)
+  for (const plane of planes) blendPlane(rgba, data.width, data.height, plane)
   const coverage = alphaCoverage(rgba)
   return {
     backend,
     width: data.width,
     height: data.height,
     rgba,
-    compositionCount: data.compositionData.length,
+    compositionCount: planes.length,
     nonTransparentPixels: coverage.nonTransparentPixels,
     alphaSum: coverage.alphaSum,
     usedFallback

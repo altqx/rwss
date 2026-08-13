@@ -31,10 +31,18 @@ const initMessage: WorkerInitMessage = {
   wasmUrl: '/akarisub-worker.wasm',
   asyncRender: true,
   fullTrackWarmup: false,
+  blockingFullTrackWarmup: false,
+  fullTrackWarmupStep: 1,
+  adaptiveBlendLayouts: false,
+  rawAssImageGpu: false,
   onDemandRender: true,
   initialTime: 0,
+  initialIsPaused: true,
+  initialPlaybackRate: 1,
+  initialTimeSnapshotAtMs: 0,
   width: 1,
   height: 1,
+  blendMode: 'wasm',
   subContent: null,
   encryptedSubContent: null,
   fonts: [],
@@ -42,10 +50,14 @@ const initMessage: WorkerInitMessage = {
   fallbackFonts: ['sans'],
   debug: false,
   targetFps: 24,
+  renderAhead: 0,
+  adaptiveTiming: true,
+  frameTimelineMode: false,
   useLocalFonts: false,
+  useFontconfigProvider: true,
   hasBitmapBug: false
 }
-const inbound: WorkerInboundMessage = { target: 'getColorSpace' }
+const inbound: WorkerInboundMessage = { target: 'prepare', time: 1, prepareId: 1, renderEpoch: 1, force: true }
 const outbound: WorkerOutboundMessage = { target: 'ready' }
 void initMessage
 void inbound

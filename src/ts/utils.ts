@@ -22,19 +22,77 @@ export const colorMatrixConversionMap: Record<string, Record<string, string>> = 
   }
 }
 
-export function computeCanvasSize(video: HTMLVideoElement, maxRenderHeight = 0): { width: number; height: number } {
-  const width = video.videoWidth || Math.round(video.getBoundingClientRect().width) || 1
-  const height = video.videoHeight || Math.round(video.getBoundingClientRect().height) || 1
-  if (maxRenderHeight > 0 && height > maxRenderHeight) {
-    const scale = maxRenderHeight / height
-    return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(maxRenderHeight)) }
+export function computeCanvasSize(video: HTMLVideoElement, maxRenderHeight?: number): { width: number; height: number }
+export function computeCanvasSize(
+  width: number,
+  height: number,
+  prescaleFactor?: number,
+  prescaleHeightLimit?: number,
+  maxRenderHeight?: number
+): { width: number; height: number }
+export function computeCanvasSize(
+  videoOrWidth: HTMLVideoElement | number,
+  heightOrMax = 0,
+  prescaleFactor = 1,
+  prescaleHeightLimit = 1080,
+  maxRenderHeight = 0
+): { width: number; height: number } {
+  if (typeof videoOrWidth !== 'number') {
+    const video = videoOrWidth
+    const width = video.videoWidth || Math.round(video.getBoundingClientRect().width) || 1
+    const height = video.videoHeight || Math.round(video.getBoundingClientRect().height) || 1
+    return computeRenderSize(width, height, 1, 1080, heightOrMax)
   }
-  return { width: Math.max(1, width), height: Math.max(1, height) }
+  return computeRenderSize(videoOrWidth, heightOrMax, prescaleFactor, prescaleHeightLimit, maxRenderHeight)
 }
 
-export function getVideoPosition(video: HTMLVideoElement): { x: number; y: number; width: number; height: number } {
-  const rect = video.getBoundingClientRect()
-  return { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
+export function computeRenderSize(
+  width: number,
+  height: number,
+  prescaleFactor = 1,
+  prescaleHeightLimit = 1080,
+  maxRenderHeight = 0
+): { width: number; height: number } {
+  const scalefactor = prescaleFactor <= 0 ? 1 : prescaleFactor
+  const ratio = globalThis.devicePixelRatio || 1
+  if (height <= 0 || width <= 0) return { width: 0, height: 0 }
+
+  const sgn = scalefactor < 1 ? -1 : 1
+  let newH = height * ratio
+  if (sgn * newH * scalefactor <= sgn * prescaleHeightLimit) newH *= scalefactor
+  else if (sgn * newH < sgn * prescaleHeightLimit) newH = prescaleHeightLimit
+  if (maxRenderHeight > 0 && newH > maxRenderHeight) newH = maxRenderHeight
+
+  return { width: width * (newH / height), height: newH }
+}
+
+export function getVideoPosition(
+  video: HTMLVideoElement,
+  videoWidth: number = video.videoWidth,
+  videoHeight: number = video.videoHeight
+): { x: number; y: number; width: number; height: number } {
+  const safeWidth = videoWidth || video.videoWidth || 0
+  const safeHeight = videoHeight || video.videoHeight || 0
+  const offsetWidth = video.offsetWidth || video.getBoundingClientRect().width || safeWidth
+  const offsetHeight = video.offsetHeight || video.getBoundingClientRect().height || safeHeight
+  if (!safeWidth || !safeHeight || !offsetWidth || !offsetHeight) {
+    const rect = video.getBoundingClientRect()
+    return { x: rect.left, y: rect.top, width: rect.width || 1, height: rect.height || 1 }
+  }
+
+  const videoRatio = safeWidth / safeHeight
+  const elementRatio = offsetWidth / offsetHeight
+  let width = offsetWidth
+  let height = offsetHeight
+  if (elementRatio > videoRatio) width = Math.floor(offsetHeight * videoRatio)
+  else height = Math.floor(offsetWidth / videoRatio)
+
+  return {
+    width,
+    height,
+    x: (offsetWidth - width) / 2,
+    y: (offsetHeight - height) / 2
+  }
 }
 
 export function fixAlpha(data: Uint8ClampedArray | Uint8Array): Uint8ClampedArray | Uint8Array {

@@ -22,7 +22,9 @@ import DefaultExport, {
   type ASSEvent,
   type ASSStyle,
   type EncryptedSubtitleContent,
-  type PerformanceStats
+  type PerformanceStats,
+  type FrameTimeline,
+  type WrassRendererBackend
 } from '../src/index'
 
 const video = document.createElement('video')
@@ -57,16 +59,30 @@ const options: VideoAssSubtitleOptions = {
   libassMemoryLimit: 64,
   libassGlyphLimit: 1024,
   onCanvasFallback() {},
-  renderAhead: 0.008,
+  renderAhead: 0,
+  adaptiveTiming: true,
+  frameTimeline: Object.assign(new Float64Array([0, 0.041708, 0.083417]), { mediaTimeOrigin: 0, subtitleTimeOffset: 0 }),
+  framePrefetch: 2,
+  blendMode: 'wasm',
+  rawAssImageGpu: false,
+  useFontconfigProvider: true,
+  blockingFullTrackWarmup: false,
+  fullTrackWarmupStep: 1,
+  adaptiveBlendLayouts: false,
   fullTrackWarmup: false
 }
 
 const renderer = new AssRenderer(options)
 const rendererFromAlias = new AkariSub(options)
 const rendererFromDefault = new DefaultExport(options)
-const rendererType: 'canvas2d' = renderer.rendererType
+const rendererType: WrassRendererBackend = renderer.rendererType
+const usingGpu: boolean = renderer.isUsingGPURenderer
+const usingWebGpu: boolean = renderer.isUsingWebGPU
 renderer.resize()
 renderer.setVideo(video)
+const timeline: FrameTimeline = new Float64Array([0, 0.041708])
+renderer.setFrameTimeline(timeline)
+renderer.setFrameTimeline(null)
 renderer.runBenchmark()
 renderer.setTrackByUrl('/subtitles.ass')
 renderer.setTrack('[Script Info]\n')
@@ -101,6 +117,8 @@ renderer.sendMessage('debug', { ok: true })
 renderer.destroy()
 
 void rendererType
+void usingGpu
+void usingWebGpu
 void eventsPromise
 void stylesPromise
 void statsPromise
