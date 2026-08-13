@@ -367,6 +367,7 @@ export type WorkerOutboundMessage =
 export interface WorkerInitMessage {
   target: 'init'
   wasmUrl: string
+  glueUrl?: string
   asyncRender: boolean
   fullTrackWarmup: boolean
   blockingFullTrackWarmup?: boolean

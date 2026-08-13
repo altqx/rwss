@@ -1,8 +1,9 @@
 import type { PerformanceStats, VideoAssSubtitleOptions, RwssFontSource, RwssRendererEvent } from './types'
+import { resolveWasmLoadUrls } from './wasm'
 
 /** Request posted to AssRendererWorkerClient. */
 export type RwssWorkerRequest =
-  | { id: number; type: 'init'; options: SerializableWorkerOptions; canvas?: OffscreenCanvas }
+  | { id: number; type: 'init'; options: SerializableWorkerOptions; canvas?: OffscreenCanvas; wasmUrl: string; glueUrl: string }
   | { id: number; type: 'render'; time: number; force?: boolean }
   | { id: number; type: 'set-track'; content: string | Uint8Array | ArrayBuffer }
   | { id: number; type: 'stats' }
@@ -32,7 +33,7 @@ export interface AssRendererWorkerClientOptions extends SerializableWorkerOption
 }
 
 type RwssWorkerRequestWithoutId =
-  | { type: 'init'; options: SerializableWorkerOptions; canvas?: OffscreenCanvas }
+  | { type: 'init'; options: SerializableWorkerOptions; canvas?: OffscreenCanvas; wasmUrl: string; glueUrl: string }
   | { type: 'render'; time: number; force?: boolean }
   | { type: 'set-track'; content: string | Uint8Array | ArrayBuffer }
   | { type: 'stats' }
@@ -61,7 +62,8 @@ export class AssRendererWorkerClient {
     void onEvent
     const transfers: Transferable[] = []
     if (canvas) transfers.push(canvas)
-    this.ready = this.send({ type: 'init', options: serializable, canvas }, transfers).then(() => undefined)
+    const { wasmUrl, glueUrl } = resolveWasmLoadUrls(serializable.wasmUrl)
+    this.ready = this.send({ type: 'init', options: serializable, canvas, wasmUrl, glueUrl }, transfers).then(() => undefined)
   }
 
   /** Ask the worker to render at a media timestamp. */

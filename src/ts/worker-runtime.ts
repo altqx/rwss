@@ -1,4 +1,5 @@
 import { AssRenderer } from './renderers'
+import { initWasm } from './wasm'
 import type { RwssWorkerRequest, RwssWorkerResponse } from './worker-client'
 
 let renderer: AssRenderer | undefined
@@ -14,11 +15,13 @@ async function handleRequest(request: RwssWorkerRequest): Promise<void> {
       case 'init': {
         currentCanvas = request.canvas
         if (!currentCanvas) throw new Error('rwss worker init requires an OffscreenCanvas')
+        await initWasm(request.wasmUrl, request.glueUrl)
         renderer = new AssRenderer({
           ...request.options,
           canvas: currentCanvas as unknown as HTMLCanvasElement,
           offscreenRender: true,
           autoLoad: false,
+          wasmUrl: undefined,
           onEvent: (rendererEvent) => post({ id: request.id, type: 'event', event: rendererEvent })
         })
         await renderer.load()

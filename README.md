@@ -44,17 +44,19 @@ cargo add rwss
 
 In most bundler-based projects, no manual WASM setup is required. `rwss` resolves the generated WASM asset relative to the package module URL, so bundlers such as Vite, webpack, and Rollup can emit the asset automatically.
 
-The WASM module initializes automatically:
+The WASM module initializes automatically, matching libbitsub:
 
 - high-level renderers call `initWasm()` through parser loading
+- `initWasm()` imports the generated glue (`pkg/rwss.js`) and lets wasm-bindgen resolve `rwss_bg.wasm` next to that file
+- workers receive both `wasmUrl` and `glueUrl` and dynamically import the glue
 - importing the library triggers a non-blocking browser pre-init
 - repeated `initWasm()` calls are safe and deduplicated
 
-If your app serves package files in a way that does not expose the emitted WASM asset to the browser, copy the generated file to a public path and pass `wasmUrl`, or serve the package asset directly:
+If your app serves package files in a way that does not expose the emitted WASM asset to the browser, copy both generated files and pass `wasmUrl`, or serve the package assets directly:
 
 ```bash
 mkdir -p public/rwss
-cp node_modules/@altqx/rwss/pkg/rwss_bg.wasm public/rwss/
+cp node_modules/@altqx/rwss/pkg/rwss_bg.wasm node_modules/@altqx/rwss/pkg/rwss.js public/rwss/
 ```
 
 ```ts
@@ -370,10 +372,11 @@ client.destroy()
 
 ### Top-level exports
 
-- `initWasm(input?): Promise<WasmModule>` initializes the generated WASM package. Called automatically by high-level and parser APIs; safe to call multiple times.
+- `initWasm(input?, glueUrl?): Promise<WasmModule>` initializes the generated WASM package. With no arguments it imports `pkg/rwss.js` and lets wasm-bindgen resolve the `.wasm` asset. Called automatically by high-level and parser APIs; safe to call multiple times.
 - `isWasmInitialized(): boolean` reports whether initialization has completed.
 - `getWasm()` returns the initialized WASM module or throws if not initialized.
-- `getWasmUrl()` returns the default or configured WASM URL.
+- `getWasmUrl()` returns the package `rwss_bg.wasm` URL resolved from `import.meta.url`.
+- `getWasmGlueUrl()` returns the package `rwss.js` glue URL resolved from `import.meta.url`.
 - `openAss(text, wasmUrl?): Promise<OpenedAssSubtitles>` opens an ASS/SSA document.
 - `detectSubtitleFormat(nameOrText): 'ass' | 'unknown'` detects ASS/SSA by extension or text header.
 - `renderFrameData(frame, options?): AssRenderedFrameData` composes an ASS frame into RGBA pixels.

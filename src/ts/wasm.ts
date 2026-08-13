@@ -1,3 +1,8 @@
+/**
+ * WASM module management for rwss.
+ * Matches libbitsub: package glue via import.meta.url, optional worker glue URL.
+ */
+
 import type {
   AssFrameRenderOptions,
   AssRenderedFrameData,
@@ -12,6 +17,9 @@ import type {
 } from './types'
 
 type WasmModule = typeof import('../../pkg/rwss')
+type WasmGlue = WasmModule & {
+  default?: (input?: { module_or_path: string | URL | Request } | string | URL | Request) => Promise<unknown>
+}
 
 /** Default fallback font family list. */
 export const DEFAULT_FALLBACK_FONTS = ['liberation sans']
@@ -22,20 +30,17 @@ export const DEFAULT_AVAILABLE_FONTS: Record<string, string | Uint8Array | Array
 
 let wasmModule: WasmModule | null = null
 let wasmInitPromise: Promise<WasmModule> | null = null
-let wasmUrl: string | URL | Request = getDefaultWasmUrl()
 
 /** Initialize the generated WASM module. Safe to call more than once. */
-export async function initWasm(input?: string | URL | Request): Promise<WasmModule> {
+export async function initWasm(input?: string | URL | Request, glueUrl?: string): Promise<WasmModule> {
   if (wasmModule) return wasmModule
   if (wasmInitPromise) return wasmInitPromise
 
-  const selectedWasmUrl = input ?? getDefaultWasmUrl()
-  wasmUrl = selectedWasmUrl
   wasmInitPromise = (async () => {
     try {
-      const mod = await import('../../pkg/rwss')
-      const init = (mod as unknown as { default?: (input?: { module_or_path: string | URL | Request } | string | URL | Request) => Promise<unknown> }).default
-      if (init) await (input === undefined ? init() : init({ module_or_path: selectedWasmUrl }))
+      const mod = await loadWasmGlue(glueUrl)
+      const init = (mod as WasmGlue).default
+      if (init) await (input === undefined ? init() : init({ module_or_path: input }))
       wasmModule = mod
       return mod
     } catch (error) {
@@ -59,20 +64,53 @@ export function getWasm(): WasmModule {
   return wasmModule
 }
 
-/** Return the configured or default WASM asset URL. */
-export function getWasmUrl(): string | URL | Request {
-  return wasmUrl
+/** Return the WASM file URL (always an absolute URL). */
+export function getWasmUrl(): string {
+  return resolvePackageAssetUrl('../../pkg/rwss_bg.wasm', '/rwss/rwss_bg.wasm')
 }
 
-function getDefaultWasmUrl(): string {
+/** Return the wasm-bindgen glue script URL (always an absolute URL). */
+export function getWasmGlueUrl(): string {
+  return resolvePackageAssetUrl('../../pkg/rwss.js', '/rwss/rwss.js')
+}
+
+/** Resolve the wasm/glue URLs a worker should load, matching libbitsub. */
+export function resolveWasmLoadUrls(wasmUrl?: string | URL | Request): { wasmUrl: string; glueUrl: string } {
+  if (wasmUrl === undefined) {
+    return { wasmUrl: getWasmUrl(), glueUrl: getWasmGlueUrl() }
+  }
+  const resolvedWasmUrl = String(wasmUrl)
+  return { wasmUrl: resolvedWasmUrl, glueUrl: deriveGlueUrl(resolvedWasmUrl) ?? getWasmGlueUrl() }
+}
+
+function resolvePackageAssetUrl(relativeFromModule: string, publicFallback: string): string {
   try {
-    return new URL('../../pkg/rwss_bg.wasm', import.meta.url).href
+    return new URL(relativeFromModule, import.meta.url).href
   } catch {
     if (typeof window !== 'undefined') {
-      return new URL('/rwss/rwss_bg.wasm', window.location.origin).href
+      return new URL(publicFallback, window.location.origin).href
     }
-    return '/rwss/rwss_bg.wasm'
+    return publicFallback
   }
+}
+
+function deriveGlueUrl(wasmUrl: string | URL | Request): string | undefined {
+  const raw = String(wasmUrl)
+  if (/_bg\.wasm(?:\?.*)?$/i.test(raw)) return raw.replace(/_bg\.wasm(?=\?|$)/i, '.js')
+  try {
+    const derivedUrl = new URL(raw)
+    if (!/_bg\.wasm$/i.test(derivedUrl.pathname)) return undefined
+    derivedUrl.pathname = derivedUrl.pathname.replace(/_bg\.wasm$/i, '.js')
+    return derivedUrl.href
+  } catch {
+    return undefined
+  }
+}
+
+async function loadWasmGlue(glueUrl?: string): Promise<WasmModule> {
+  if (!glueUrl) return import('../../pkg/rwss')
+  const importer = new Function('url', 'return import(url)') as (url: string) => Promise<WasmModule>
+  return importer(glueUrl)
 }
 
 if (typeof window !== 'undefined') {
@@ -83,7 +121,7 @@ if (typeof window !== 'undefined') {
 
 /** Register a font from a URL, bytes, or RwssFontSource. */
 export async function registerFont(font: RwssFontSource | string, data?: Uint8Array | ArrayBuffer | ArrayBufferView, options?: RwssFontLoadOptions): Promise<string | undefined> {
-  await initWasm(wasmUrl)
+  await initWasm()
   if (typeof font === 'string') {
     const bytes = data ? toUint8Array(data) : await fetchFontBytes(font, options?.timeoutMs)
     if (!bytes) return undefined
@@ -95,7 +133,7 @@ export async function registerFont(font: RwssFontSource | string, data?: Uint8Ar
 /** Register a named map of fonts and optional fallbacks. */
 export async function registerAvailableFonts(fonts?: Record<string, string | Uint8Array | ArrayBuffer | ArrayBufferView>, options: RwssAvailableFontLoadOptions = {}): Promise<string[]> {
   if (!fonts) return []
-  await initWasm(wasmUrl)
+  await initWasm()
   if (options.fallbackFonts) setFallbackFonts(options.fallbackFonts)
   const registered: string[] = []
   for (const [name, value] of Object.entries(fonts)) {

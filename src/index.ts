@@ -28,6 +28,7 @@ export {
   isWasmInitialized,
   getWasm,
   getWasmUrl,
+  getWasmGlueUrl,
   registerFont,
   registerAvailableFonts,
   registerFontBytes,

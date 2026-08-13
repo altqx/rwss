@@ -11,13 +11,15 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.js"
     },
     "./pkg": {
+      "types": "./pkg/rwss.d.ts",
       "import": "./pkg/rwss.js",
-      "types": "./pkg/rwss.d.ts"
+      "default": "./pkg/rwss.js"
     }
   },
   "files": ["dist", "pkg", "src/wrapper.ts", "src/default.woff2"],

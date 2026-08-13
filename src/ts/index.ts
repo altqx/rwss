@@ -51,7 +51,7 @@ export {
   MAX_RENDER_PIXELS
 } from './types'
 
-export { initWasm, isWasmInitialized, getWasm, getWasmUrl } from './wasm'
+export { initWasm, isWasmInitialized, getWasm, getWasmUrl, getWasmGlueUrl } from './wasm'
 export {
   DEFAULT_AVAILABLE_FONTS,
   DEFAULT_FALLBACK_FONTS,
