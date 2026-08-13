@@ -158,6 +158,15 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+            apt-get install -y --no-install-recommends \
+            pkg-config \
+            libfreetype6-dev \
+            libfontconfig1-dev
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
