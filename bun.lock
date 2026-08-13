@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "rwss",
+      "name": "@altqx/rwss",
       "dependencies": {
         "@webgpu/types": "^0.1.71",
       },

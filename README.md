@@ -27,9 +27,9 @@ High-performance browser ASS/SSA subtitle renderer powered by the pure-Rust [`ra
 ## Installation
 
 ```bash
-npm install rwss
+npm install @altqx/rwss
 # or
-bun add rwss
+bun add @altqx/rwss
 ```
 
 ```bash
@@ -54,11 +54,11 @@ If your app serves package files in a way that does not expose the emitted WASM 
 
 ```bash
 mkdir -p public/rwss
-cp node_modules/rwss/pkg/rwss_bg.wasm public/rwss/
+cp node_modules/@altqx/rwss/pkg/rwss_bg.wasm public/rwss/
 ```
 
 ```ts
-import { initWasm } from 'rwss'
+import { initWasm } from '@altqx/rwss'
 
 await initWasm('/rwss/rwss_bg.wasm')
 ```
@@ -89,7 +89,7 @@ PATH="$HOME/.bun/bin:$PATH" bun run test
 The high-level renderer manages subtitle loading, canvas overlay creation, playback sync, browser font setup, and render timing:
 
 ```ts
-import { AssRenderer } from 'rwss'
+import { AssRenderer } from '@altqx/rwss'
 
 const renderer = new AssRenderer({
   video: videoElement,
@@ -110,7 +110,7 @@ renderer.destroy()
 If you already have subtitle text or bytes, pass `subContent` instead of `subUrl`:
 
 ```ts
-import { AssRenderer } from 'rwss'
+import { AssRenderer } from '@altqx/rwss'
 
 const renderer = new AssRenderer({
   video: videoElement,
@@ -121,7 +121,7 @@ const renderer = new AssRenderer({
 `AkariSub` is exported as an alias of `AssRenderer` for integrations that use an AkariSub-like entry point:
 
 ```ts
-import { AkariSub } from 'rwss'
+import { AkariSub } from '@altqx/rwss'
 
 const renderer = new AkariSub({ video: videoElement, subUrl: '/subtitles/movie.ass' })
 ```
@@ -157,7 +157,7 @@ Custom canvases stay on the main thread by default. Set both `offscreenRender: t
 Use `openAss()` when you want in-memory parsing/rendering without a video element:
 
 ```ts
-import { openAss } from 'rwss'
+import { openAss } from '@altqx/rwss'
 
 const subtitles = await openAss(assText)
 
@@ -191,7 +191,7 @@ subtitles.dispose()
 Parser output can be flattened into exportable RGBA pixels for previews, editors, snapshots, or visual diffing:
 
 ```ts
-import { openAss, renderFrameData, toBlob, toCanvas, toImageBitmap } from 'rwss'
+import { openAss, renderFrameData, toBlob, toCanvas, toImageBitmap } from '@altqx/rwss'
 
 const subtitles = await openAss(assText)
 const subtitleFrame = subtitles.renderAtTimestamp(120.5)
@@ -225,7 +225,7 @@ Cropping modes:
 `rwss` registers browser-provided fonts into rassa's virtual font registry before opening a track.
 
 ```ts
-import { AssRenderer } from 'rwss'
+import { AssRenderer } from '@altqx/rwss'
 
 const renderer = new AssRenderer({
   video: videoElement,
@@ -249,7 +249,7 @@ Font inputs can be URLs, `Uint8Array`/`ArrayBuffer` bytes, or `RwssFontSource` o
 `rwss` can accept AES-GCM encrypted subtitle content where each chunk is IV-prefixed. Raw 128/192/256-bit key bytes or `CryptoKey` objects are accepted:
 
 ```ts
-import { AssRenderer, createEncryptedSubtitleContent, importAesGcmKey } from 'rwss'
+import { AssRenderer, createEncryptedSubtitleContent, importAesGcmKey } from '@altqx/rwss'
 
 const key = await importAesGcmKey(rawKeyBytes)
 const encryptedSubContent = await createEncryptedSubtitleContent(assText, key)
@@ -325,7 +325,7 @@ await renderer.resetStats()
 Video-managed overlays automatically pick WebGPU → WebGL2 → Canvas2D. Custom canvases stay on Canvas2D so callers can keep `getContext()` / pixel readback. For lower-level integrations, `WebGPURenderer` and `WebGL2Renderer` expose ASS image-plane composition surfaces:
 
 ```ts
-import { WebGPURenderer, WebGL2Renderer, isWebGPUSupported, isWebGL2Supported } from 'rwss'
+import { WebGPURenderer, WebGL2Renderer, isWebGPUSupported, isWebGL2Supported } from '@altqx/rwss'
 
 console.log({ webgpu: isWebGPUSupported(), webgl2: isWebGL2Supported() })
 
@@ -343,7 +343,7 @@ Both GPU helpers return or draw `RwssImageCompositionResult` data, and unsupport
 `AssRendererWorkerClient` provides a worker protocol for OffscreenCanvas handoff:
 
 ```ts
-import { createAssRendererWorkerClient } from 'rwss'
+import { createAssRendererWorkerClient } from '@altqx/rwss'
 
 const client = createAssRendererWorkerClient({
   canvas: offscreenCanvas,
