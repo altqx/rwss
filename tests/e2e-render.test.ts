@@ -18,7 +18,9 @@ const WASM_PATH = join(ROOT, 'pkg', 'rwss_bg.wasm')
 const FONT_CANDIDATES = [
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
   '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
-  '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'
+  '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+  '/usr/share/fonts/noto/NotoSans-Regular.ttf',
+  '/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf'
 ]
 
 const SAMPLE_ASS = `[Script Info]

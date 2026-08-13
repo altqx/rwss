@@ -17,6 +17,7 @@ import { decryptSubtitleContent } from './crypto'
 import {
   DEFAULT_AVAILABLE_FONTS,
   DEFAULT_FALLBACK_FONTS,
+  initWasm,
   registerAvailableFonts,
   registerFont,
   registerFontData,
@@ -879,6 +880,10 @@ export class AssRenderer extends EventTarget {
   }
 
   private async registerConfiguredFonts(content?: string): Promise<void> {
+    // Font fallback registration is synchronous and reads the initialized
+    // WASM exports. A renderer created immediately after a lazy module import
+    // must not depend on the delayed browser pre-init winning that race.
+    await initWasm(this.options.wasmUrl)
     const fallbackFonts = this.options.fallbackFonts ?? DEFAULT_FALLBACK_FONTS
     setFallbackFonts(fallbackFonts)
     const availableFonts = this.options.availableFonts ?? DEFAULT_AVAILABLE_FONTS
@@ -971,8 +976,10 @@ export class AssRenderer extends EventTarget {
     if (!this.canvas.style) return
     this.canvas.style.width = `${videoSize.width}px`
     this.canvas.style.height = `${videoSize.height}px`
-    this.canvas.style.top = `${videoSize.y}px`
-    this.canvas.style.left = `${videoSize.x}px`
+    const videoRect = video.getBoundingClientRect()
+    const parentRect = this.canvasParent?.getBoundingClientRect() ?? videoRect
+    this.canvas.style.top = `${videoRect.top + videoSize.y - parentRect.top}px`
+    this.canvas.style.left = `${videoRect.left + videoSize.x - parentRect.left}px`
   }
 
   private setCanvasSize(width: number, height: number): void {
@@ -1003,7 +1010,9 @@ export class AssRenderer extends EventTarget {
     parent.style.isolation = 'isolate'
     parent.style.pointerEvents = 'none'
     video.insertAdjacentElement('afterend', parent)
-    parent.append(video, canvas)
+    // Keep framework-owned media in its original DOM position. Moving the
+    // video into this disposable overlay would make destroy() remove it too.
+    parent.append(canvas)
     this.canvasParent = parent
     return canvas
   }
