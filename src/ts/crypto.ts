@@ -1,5 +1,12 @@
 import type { EncryptedSubtitleContent } from './types'
 
+const AKARI_PROTOCOL_VERSION_V2 = 2
+const AKARI_KEY_ID_SIZE = 8
+const AES_GCM_IV_SIZE = 12
+const AES_GCM_TAG_SIZE = 16
+const AKARI_V2_HEADER_SIZE = 1 + AKARI_KEY_ID_SIZE
+const AKARI_V2_PAYLOAD_PREFIX_SIZE = AKARI_V2_HEADER_SIZE + AES_GCM_IV_SIZE
+
 /** Raw AES-GCM key bytes accepted by the crypto helpers. */
 export type RwssRawAesKey = Uint8Array | ArrayBuffer | ArrayBufferView
 
@@ -29,10 +36,7 @@ export async function decryptSubtitleContent(content: EncryptedSubtitleContent):
   const parts: Uint8Array[] = []
   for (const chunk of chunks) {
     const bytes = new Uint8Array(chunk)
-    if (bytes.byteLength < 13) throw new Error('Encrypted subtitle payload must be IV-prefixed AES-GCM data')
-    const iv = bytes.slice(0, 12)
-    const ciphertext = bytes.slice(12)
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, contentKey, ciphertext)
+    const plain = await decryptSubtitleChunk(bytes, contentKey)
     parts.push(new Uint8Array(plain))
   }
   const total = parts.reduce((sum, part) => sum + part.byteLength, 0)
@@ -43,6 +47,41 @@ export async function decryptSubtitleContent(content: EncryptedSubtitleContent):
     offset += part.byteLength
   }
   return new TextDecoder().decode(joined)
+}
+
+async function decryptSubtitleChunk(bytes: Uint8Array, contentKey: CryptoKey): Promise<ArrayBuffer> {
+  if (isAkariV2Payload(bytes)) {
+    const header = bytes.slice(0, AKARI_V2_HEADER_SIZE)
+    const iv = bytes.slice(AKARI_V2_HEADER_SIZE, AKARI_V2_PAYLOAD_PREFIX_SIZE)
+    const ciphertext = bytes.slice(AKARI_V2_PAYLOAD_PREFIX_SIZE)
+    try {
+      return await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv, additionalData: header, tagLength: 128 },
+        contentKey,
+        ciphertext
+      )
+    } catch (v2Error) {
+      try {
+        return await decryptLegacyChunk(bytes, contentKey)
+      } catch {
+        throw v2Error
+      }
+    }
+  }
+  return decryptLegacyChunk(bytes, contentKey)
+}
+
+function isAkariV2Payload(bytes: Uint8Array): boolean {
+  return bytes.byteLength >= AKARI_V2_PAYLOAD_PREFIX_SIZE + AES_GCM_TAG_SIZE && bytes[0] === AKARI_PROTOCOL_VERSION_V2
+}
+
+async function decryptLegacyChunk(bytes: Uint8Array, contentKey: CryptoKey): Promise<ArrayBuffer> {
+  if (bytes.byteLength < AES_GCM_IV_SIZE + 1) {
+    throw new Error('Encrypted subtitle payload must be IV-prefixed AES-GCM data')
+  }
+  const iv = bytes.slice(0, AES_GCM_IV_SIZE)
+  const ciphertext = bytes.slice(AES_GCM_IV_SIZE)
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv }, contentKey, ciphertext)
 }
 
 function isCryptoKey(key: CryptoKey | RwssRawAesKey): key is CryptoKey {

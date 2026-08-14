@@ -67,6 +67,53 @@ describe('AssRenderer lifecycle', () => {
     })
   })
 
+  test('constructor auto-load reports a failure without an unhandled rejection', () => {
+    const script = `
+      import { AssRenderer } from './src/ts/renderers.ts'
+
+      globalThis.requestAnimationFrame = () => 1
+      globalThis.cancelAnimationFrame = () => {}
+      const canvas = {
+        width: 320,
+        height: 180,
+        style: {},
+        getContext: (kind) => kind === '2d' ? { clearRect() {}, drawImage() {} } : null
+      }
+      const contentKey = await crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      )
+      let reported = false
+      const renderer = new AssRenderer({
+        canvas,
+        encryptedSubContent: { contentKey, encrypted: new Uint8Array(32).buffer },
+        onError: () => { reported = true }
+      })
+
+      await Bun.sleep(20)
+      if (!reported) throw new Error('auto-load failure was not reported')
+      renderer.destroy()
+      console.log('autoload-error-reported')
+    `
+    const result = Bun.spawnSync({
+      cmd: [process.execPath, '-e', script],
+      cwd: ROOT,
+      stdout: 'pipe',
+      stderr: 'pipe'
+    })
+
+    expect({
+      exitCode: result.exitCode,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString()
+    }).toEqual({
+      exitCode: 0,
+      stdout: 'autoload-error-reported\n',
+      stderr: ''
+    })
+  })
+
   test('keeps a managed video in its original DOM parent through destroy', () => {
     const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document')
     const fakeDocument = new FakeDocument()

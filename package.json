@@ -1,6 +1,6 @@
 {
   "name": "@altqx/rwss",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "altqx",
   "license": "MIT",
   "description": "Web browser ASS/SSA renderer wrapper around rassa",

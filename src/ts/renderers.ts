@@ -184,7 +184,10 @@ export class AssRenderer extends EventTarget {
     if (!this.isCustomCanvas) this.initManagedGpuRenderer()
     if (this.backend === 'canvas2d') this.options.onCanvasFallback?.()
     if (options.video) this.setVideo(options.video)
-    if (this.options.autoLoad !== false) void this.load()
+    // load() already reports failures through onError and the error event.
+    // Consume the constructor-started promise so those failures do not also
+    // surface as an unhandled rejection; explicit load() calls still reject.
+    if (this.options.autoLoad !== false) void this.load().catch(() => {})
   }
 
   /** Active presentation backend. */
