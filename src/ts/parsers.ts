@@ -1,7 +1,16 @@
 import type { ASSEvent, ASSStyle, AssMetadata, AssSubtitleData, OpenedAssSubtitles, AssFrameRenderOptions, AssRenderedFrameData } from './types'
-import { getWasm, initWasm, normalizeFrameData, renderFrameData } from './wasm'
+import { getWasm, initWasm, normalizeFrameData } from './wasm'
 
-type WasmAssParser = InstanceType<typeof import('../../pkg/rwss').AssParser>
+type WasmAssParserBase = InstanceType<typeof import('../../pkg/rwss').AssParser>
+type WasmRenderedFrameData = Omit<AssRenderedFrameData, 'imageData'> & {
+  imageData: Uint8Array | number[]
+  imageWidth?: number
+  imageHeight?: number
+}
+type WasmAssParser = WasmAssParserBase & {
+  renderFrameBoundsDataAtIndex(index: number): WasmRenderedFrameData
+  renderFrameBoundsDataAtTimestamp(timeSeconds: number): WasmRenderedFrameData
+}
 
 /** Low-level ASS/SSA parser and frame renderer backed by rassa WASM. */
 export class AssParser implements OpenedAssSubtitles {
@@ -38,16 +47,16 @@ export class AssParser implements OpenedAssSubtitles {
 
   /** Flatten the event at a timestamp-list index into RGBA. */
   renderFrameDataAtIndex(index: number, options?: AssFrameRenderOptions): AssRenderedFrameData | undefined {
-    const raw = this.renderAtIndex(index)
-    if (!raw) return undefined
-    return options?.crop === 'bounds' ? renderFrameData(raw, options) : normalizeFrameData(this.parser.renderFrameDataAtIndex(index))
+    return this.callFrameRender(() => options?.crop === 'bounds'
+      ? this.parser.renderFrameBoundsDataAtIndex(index)
+      : this.parser.renderFrameDataAtIndex(index) as WasmRenderedFrameData)
   }
 
   /** Flatten the frame at a media timestamp into RGBA. */
   renderFrameDataAtTimestamp(timeSeconds: number, options?: AssFrameRenderOptions): AssRenderedFrameData | undefined {
-    const raw = this.renderAtTimestamp(timeSeconds)
-    if (!raw) return undefined
-    return options?.crop === 'bounds' ? renderFrameData(raw, options) : normalizeFrameData(this.parser.renderFrameDataAtTimestamp(timeSeconds))
+    return this.callFrameRender(() => options?.crop === 'bounds'
+      ? this.parser.renderFrameBoundsDataAtTimestamp(timeSeconds)
+      : this.parser.renderFrameDataAtTimestamp(timeSeconds) as WasmRenderedFrameData)
   }
 
   /** Return parsed ASS events. */
@@ -74,6 +83,15 @@ export class AssParser implements OpenedAssSubtitles {
     try {
       const data = fn()
       return data.compositionData.length > 0 ? data : undefined
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  }
+
+  private callFrameRender(fn: () => WasmRenderedFrameData): AssRenderedFrameData | undefined {
+    try {
+      const data = fn()
+      return data.compositionCount > 0 ? normalizeFrameData(data) : undefined
     } catch (error) {
       throw normalizeError(error)
     }

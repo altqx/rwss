@@ -31,8 +31,15 @@ async function handleRequest(request: RwssWorkerRequest): Promise<void> {
       case 'render': {
         assertRenderer()
         const start = performance.now()
-        renderer!.setCurrentTime(undefined, request.time, undefined)
-        post({ id: request.id, type: 'rendered', time: request.time, compositionCount: 0, renderTime: performance.now() - start })
+        renderer!.setCurrentTime(undefined, request.time, undefined, request.force ?? false)
+        const stats = renderer!.getStatsSnapshot()
+        post({
+          id: request.id,
+          type: 'rendered',
+          time: request.time,
+          compositionCount: stats.lastImageCount ?? 0,
+          renderTime: performance.now() - start
+        })
         break
       }
       case 'set-track':

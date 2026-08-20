@@ -1,4 +1,4 @@
-import type { AssSubtitleData, RenderImage, RwssPlaneData } from './types'
+import type { AssSubtitleData, RenderImage } from './types'
 import { composeAssFrameCpu, limitAssImages, putCompositionOnCanvas, type RwssImageCompositionResult } from './gpu-compositor'
 
 /** Construction options for WebGPURenderer. */
@@ -11,7 +11,27 @@ export interface WebGPURendererOptions {
 interface WebGPUPipelineState {
   pipeline: GPURenderPipeline
   sampler: GPUSampler
+}
+
+interface WebGPUPlaneResource {
+  texture: GPUTexture
+  view: GPUTextureView
   vertexBuffer: GPUBuffer
+  bindGroup: GPUBindGroup
+  width: number
+  height: number
+  geometry: readonly number[] | null
+  uploadData?: Uint8Array
+}
+
+interface WebGPUPresentPlane {
+  x: number
+  y: number
+  width: number
+  height: number
+  stride: number
+  rgba?: Uint8Array | number[]
+  bitmap?: ImageBitmap
 }
 
 /** WebGPU compositor for ASS image planes, with CPU fallback. */
@@ -22,7 +42,10 @@ export class WebGPURenderer {
   private context: GPUCanvasContext | null
   private format: GPUTextureFormat
   private pipelineState: WebGPUPipelineState | null = null
+  private planeResources: WebGPUPlaneResource[] = []
   private initPromise: Promise<boolean> | null = null
+  private configuredContext: GPUCanvasContext | null = null
+  private configuredDevice: GPUDevice | null = null
   private _canvas?: HTMLCanvasElement | OffscreenCanvas
 
   /** Bind an optional canvas and optional pre-created GPU device/context. */
@@ -66,7 +89,7 @@ export class WebGPURenderer {
   render(images: RenderImage[], canvasWidth: number, canvasHeight: number): void
   render(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): RwssImageCompositionResult | void {
     if (Array.isArray(dataOrImages)) {
-      void this.renderImages(dataOrImages, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
+      void this.present(dataOrImages, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
       return
     }
     const data = dataOrImages
@@ -79,32 +102,44 @@ export class WebGPURenderer {
 
   /** Compose ASS planes through WebGPU, falling back to CPU on failure. */
   async renderAsync(data: AssSubtitleData): Promise<RwssImageCompositionResult> {
-    if (!await this.init()) return this.render(data)
-
     try {
+      if (!await this.init()) return this.render(data)
       return await this.renderWithWebGPU(data)
     } catch {
       return this.render(data)
     }
   }
 
+  /** Present ASS planes or raw images directly to the canvas swapchain without GPU readback. */
+  present(data: AssSubtitleData): Promise<boolean>
+  present(images: RenderImage[], canvasWidth: number, canvasHeight: number): Promise<boolean>
+  async present(dataOrImages: AssSubtitleData | RenderImage[], canvasWidth?: number, canvasHeight?: number): Promise<boolean> {
+    if (!Array.isArray(dataOrImages)) {
+      return this.presentPlanes(limitAssImages(dataOrImages.compositionData), dataOrImages.width, dataOrImages.height)
+    }
+    const planes = renderImagesToPresentPlanes(dataOrImages)
+    return this.presentPlanes(planes, canvasWidth ?? this._canvas?.width ?? 1, canvasHeight ?? this._canvas?.height ?? 1)
+  }
+
   async setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, width: number, height: number): Promise<void> {
     this._canvas = canvas
     this.context = getWebGPUContext(canvas)
-    if (width > 0) canvas.width = width
-    if (height > 0) canvas.height = height
-    if (await this.init()) this.configureContext()
+    this.configuredContext = null
+    this.configuredDevice = null
+    if (width > 0 && canvas.width !== width) canvas.width = width
+    if (height > 0 && canvas.height !== height) canvas.height = height
+    await this.init()
   }
 
   updateSize(width: number, height: number): void {
     if (!this._canvas || width <= 0 || height <= 0) return
-    this._canvas.width = width
-    this._canvas.height = height
+    if (this._canvas.width !== width) this._canvas.width = width
+    if (this._canvas.height !== height) this._canvas.height = height
   }
 
   renderBitmaps(images: { image: ImageBitmap; x: number; y: number }[], canvasWidth: number, canvasHeight: number): void {
     const normalized: RenderImage[] = images.map(({ image, x, y }) => ({ x, y, w: image.width, h: image.height, image }))
-    void this.renderImages(normalized, canvasWidth, canvasHeight)
+    void this.present(normalized, canvasWidth, canvasHeight)
   }
 
   clear(): void {
@@ -118,21 +153,14 @@ export class WebGPURenderer {
 
   /** Release GPU pipeline resources. */
   destroy(): void {
-    this.pipelineState?.vertexBuffer.destroy()
+    for (const resource of this.planeResources) destroyPlaneResource(resource)
+    this.planeResources.length = 0
     this.pipelineState = null
     this.device = null
     this.context = null
-  }
-
-  private async renderImages(images: RenderImage[], canvasWidth: number, canvasHeight: number): Promise<void> {
-    const data: AssSubtitleData = {
-      width: canvasWidth,
-      height: canvasHeight,
-      compositionData: limitAssImages(images)
-        .filter((image) => image.w > 0 && image.h > 0 && typeof image.image !== 'number')
-        .map(renderImageToPlane)
-    }
-    if (await this.init()) await this.renderWithWebGPU(data)
+    this.configuredContext = null
+    this.configuredDevice = null
+    this.initPromise = null
   }
 
   private async initDevice(): Promise<boolean> {
@@ -148,12 +176,15 @@ export class WebGPURenderer {
 
   private configureContext(): void {
     if (!this.context || !this.device) return
+    if (this.configuredContext === this.context && this.configuredDevice === this.device) return
     this.context.configure({
       device: this.device,
       format: this.format,
       alphaMode: 'premultiplied',
       usage: gpuTextureUsage().RENDER_ATTACHMENT | gpuTextureUsage().COPY_SRC
     })
+    this.configuredContext = this.context
+    this.configuredDevice = this.device
   }
 
   private async renderWithWebGPU(data: AssSubtitleData): Promise<RwssImageCompositionResult> {
@@ -166,68 +197,153 @@ export class WebGPURenderer {
       usage: gpuTextureUsage().RENDER_ATTACHMENT | gpuTextureUsage().COPY_SRC
     })
 
-    const encoder = device.createCommandEncoder()
-    const planes = limitAssImages(data.compositionData)
-    planes.forEach((plane, index) => {
-      this.drawPlane(device, encoder, targetTexture, data.width, data.height, plane, index === 0)
-    })
-
-    const rgba = await this.readTexture(device, encoder, targetTexture, data.width, data.height)
-    targetTexture.destroy()
-
-    const coverage = alphaCoverage(rgba)
-    return {
-      backend: 'webgpu',
-      width: data.width,
-      height: data.height,
-      rgba,
-      compositionCount: planes.length,
-      nonTransparentPixels: coverage.nonTransparentPixels,
-      alphaSum: coverage.alphaSum,
-      usedFallback: false
+    try {
+      const encoder = device.createCommandEncoder()
+      const compositionCount = this.encodePlanes(
+        device,
+        encoder,
+        targetTexture,
+        data.width,
+        data.height,
+        limitAssImages(data.compositionData)
+      )
+      const rgba = await this.readTexture(device, encoder, targetTexture, data.width, data.height)
+      const coverage = alphaCoverage(rgba)
+      return {
+        backend: 'webgpu',
+        width: data.width,
+        height: data.height,
+        rgba,
+        compositionCount,
+        nonTransparentPixels: coverage.nonTransparentPixels,
+        alphaSum: coverage.alphaSum,
+        usedFallback: false
+      }
+    } finally {
+      targetTexture.destroy()
     }
   }
 
-  private drawPlane(device: GPUDevice, encoder: GPUCommandEncoder, targetTexture: GPUTexture, frameWidth: number, frameHeight: number, plane: RwssPlaneData, clear: boolean): void {
+  private async presentPlanes(planes: readonly WebGPUPresentPlane[], width: number, height: number): Promise<boolean> {
+    if (width <= 0 || height <= 0) return false
+    try {
+      if (!await this.init()) return false
+      const device = this.device
+      const context = this.context
+      if (!device || !context) return false
+      this.updateSize(width, height)
+      const targetTexture = context.getCurrentTexture()
+      const encoder = device.createCommandEncoder()
+      this.encodePlanes(device, encoder, targetTexture, width, height, planes)
+      device.queue.submit([encoder.finish()])
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private encodePlanes(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    targetTexture: GPUTexture,
+    frameWidth: number,
+    frameHeight: number,
+    planes: readonly WebGPUPresentPlane[]
+  ): number {
     const state = this.ensurePipeline(device)
-    const texture = device.createTexture({
-      size: { width: plane.width, height: plane.height },
-      format: 'rgba8unorm',
-      usage: gpuTextureUsage().TEXTURE_BINDING | gpuTextureUsage().COPY_DST
-    })
-    const upload = paddedPlaneTextureData(plane)
-    device.queue.writeTexture(
-      { texture },
-      upload.data,
-      { bytesPerRow: upload.bytesPerRow, rowsPerImage: plane.height },
-      { width: plane.width, height: plane.height }
-    )
-
-    device.queue.writeBuffer(state.vertexBuffer, 0, planeVertices(plane, frameWidth, frameHeight))
-    const bindGroup = device.createBindGroup({
-      layout: state.pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: state.sampler },
-        { binding: 1, resource: texture.createView() }
-      ]
-    })
-
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view: targetTexture.createView(),
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: clear ? 'clear' : 'load',
+          loadOp: 'clear',
           storeOp: 'store'
         }
       ]
     })
     pass.setPipeline(state.pipeline)
-    pass.setBindGroup(0, bindGroup)
-    pass.setVertexBuffer(0, state.vertexBuffer)
-    pass.draw(6)
+    let compositionCount = 0
+    for (const plane of planes) {
+      if (plane.width <= 0 || plane.height <= 0) continue
+      const resource = this.ensurePlaneResource(device, state, compositionCount, plane.width, plane.height)
+      this.uploadPlane(device, resource, plane)
+      this.updatePlaneGeometry(device, resource, plane, frameWidth, frameHeight)
+      pass.setBindGroup(0, resource.bindGroup)
+      pass.setVertexBuffer(0, resource.vertexBuffer)
+      pass.draw(6)
+      compositionCount++
+    }
     pass.end()
-    texture.destroy()
+    return compositionCount
+  }
+
+  private ensurePlaneResource(
+    device: GPUDevice,
+    state: WebGPUPipelineState,
+    index: number,
+    width: number,
+    height: number
+  ): WebGPUPlaneResource {
+    let resource = this.planeResources[index]
+    if (!resource) {
+      const vertexBuffer = device.createBuffer({ size: 6 * 4 * 4, usage: gpuBufferUsage().VERTEX | gpuBufferUsage().COPY_DST })
+      const texture = createPlaneTexture(device, width, height)
+      const view = texture.createView()
+      resource = {
+        texture,
+        view,
+        vertexBuffer,
+        bindGroup: createPlaneBindGroup(device, state, view),
+        width,
+        height,
+        geometry: null
+      }
+      this.planeResources[index] = resource
+      return resource
+    }
+    if (resource.width !== width || resource.height !== height) {
+      resource.texture.destroy()
+      resource.texture = createPlaneTexture(device, width, height)
+      resource.view = resource.texture.createView()
+      resource.bindGroup = createPlaneBindGroup(device, state, resource.view)
+      resource.width = width
+      resource.height = height
+      resource.uploadData = undefined
+    }
+    return resource
+  }
+
+  private uploadPlane(device: GPUDevice, resource: WebGPUPlaneResource, plane: WebGPUPresentPlane): void {
+    if (plane.bitmap) {
+      device.queue.copyExternalImageToTexture(
+        { source: plane.bitmap },
+        { texture: resource.texture },
+        { width: plane.width, height: plane.height }
+      )
+      return
+    }
+    if (!plane.rgba) throw new Error('WebGPU plane has no pixel source')
+    const upload = paddedPlaneTextureData(plane, plane.rgba, resource.uploadData)
+    resource.uploadData = upload.data
+    device.queue.writeTexture(
+      { texture: resource.texture },
+      upload.data,
+      { bytesPerRow: upload.bytesPerRow, rowsPerImage: plane.height },
+      { width: plane.width, height: plane.height }
+    )
+  }
+
+  private updatePlaneGeometry(
+    device: GPUDevice,
+    resource: WebGPUPlaneResource,
+    plane: WebGPUPresentPlane,
+    frameWidth: number,
+    frameHeight: number
+  ): void {
+    const geometry = [plane.x, plane.y, plane.width, plane.height, frameWidth, frameHeight]
+    if (resource.geometry?.every((value, index) => value === geometry[index])) return
+    device.queue.writeBuffer(resource.vertexBuffer, 0, planeVertices(plane, frameWidth, frameHeight))
+    resource.geometry = geometry
   }
 
   private ensurePipeline(device: GPUDevice): WebGPUPipelineState {
@@ -287,8 +403,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4f {
       primitive: { topology: 'triangle-list' }
     })
     const sampler = device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' })
-    const vertexBuffer = device.createBuffer({ size: 6 * 4 * 4, usage: gpuBufferUsage().VERTEX | gpuBufferUsage().COPY_DST })
-    this.pipelineState = { pipeline, sampler, vertexBuffer }
+    this.pipelineState = { pipeline, sampler }
     return this.pipelineState
   }
 
@@ -318,21 +433,23 @@ export function isWebGPUSupported(): boolean {
   return !!getNavigatorGpu()
 }
 
-function renderImageToPlane(image: RenderImage): RwssPlaneData {
-  return {
-    x: image.x,
-    y: image.y,
-    width: image.w,
-    height: image.h,
-    stride: image.w * 4,
-    rgba: isImageBitmapValue(image.image) ? new Uint8Array(image.w * image.h * 4) : renderImageBytes(image.image),
-    color: 0xffffffff,
-    kind: 0
-  }
-}
-
 function isImageBitmapValue(value: RenderImage['image']): value is ImageBitmap {
   return typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap
+}
+
+function renderImagesToPresentPlanes(images: RenderImage[]): WebGPUPresentPlane[] {
+  const planes: WebGPUPresentPlane[] = []
+  for (const image of limitAssImages(images)) {
+    if (image.w <= 0 || image.h <= 0 || typeof image.image === 'number') continue
+    if (isImageBitmapValue(image.image)) {
+      planes.push({ x: image.x, y: image.y, width: image.w, height: image.h, stride: image.w * 4, bitmap: image.image })
+      continue
+    }
+    const rgba = renderImageBytes(image.image)
+    if (rgba.byteLength === 0) continue
+    planes.push({ x: image.x, y: image.y, width: image.w, height: image.h, stride: image.w * 4, rgba })
+  }
+  return planes
 }
 
 function renderImageBytes(value: RenderImage['image']): Uint8Array {
@@ -359,7 +476,30 @@ function getPreferredCanvasFormat(): GPUTextureFormat {
   return gpu?.getPreferredCanvasFormat?.() ?? 'rgba8unorm'
 }
 
-function planeVertices(plane: RwssPlaneData, frameWidth: number, frameHeight: number): Float32Array {
+function createPlaneTexture(device: GPUDevice, width: number, height: number): GPUTexture {
+  return device.createTexture({
+    size: { width, height },
+    format: 'rgba8unorm',
+    usage: gpuTextureUsage().TEXTURE_BINDING | gpuTextureUsage().COPY_DST
+  })
+}
+
+function createPlaneBindGroup(device: GPUDevice, state: WebGPUPipelineState, view: GPUTextureView): GPUBindGroup {
+  return device.createBindGroup({
+    layout: state.pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: state.sampler },
+      { binding: 1, resource: view }
+    ]
+  })
+}
+
+function destroyPlaneResource(resource: WebGPUPlaneResource): void {
+  resource.texture.destroy()
+  resource.vertexBuffer.destroy()
+}
+
+function planeVertices(plane: Pick<WebGPUPresentPlane, 'x' | 'y' | 'width' | 'height'>, frameWidth: number, frameHeight: number): Float32Array {
   const left = pixelXToClip(plane.x, frameWidth)
   const right = pixelXToClip(plane.x + plane.width, frameWidth)
   const top = pixelYToClip(plane.y, frameHeight)
@@ -382,11 +522,12 @@ function pixelYToClip(y: number, height: number): number {
   return height > 0 ? 1 - y / height * 2 : 1
 }
 
-function paddedPlaneTextureData(plane: RwssPlaneData): { data: Uint8Array; bytesPerRow: number } {
-  const source = plane.rgba instanceof Uint8Array ? plane.rgba : new Uint8Array(plane.rgba)
+function paddedPlaneTextureData(plane: WebGPUPresentPlane, rgba: Uint8Array | number[], reusable?: Uint8Array): { data: Uint8Array; bytesPerRow: number } {
+  const source = rgba instanceof Uint8Array ? rgba : new Uint8Array(rgba)
   const sourceStride = plane.stride || plane.width * 4
   const bytesPerRow = alignTo(plane.width * 4, 256)
-  const data = new Uint8Array(bytesPerRow * plane.height)
+  const byteLength = bytesPerRow * plane.height
+  const data = reusable?.byteLength === byteLength ? reusable : new Uint8Array(byteLength)
   for (let y = 0; y < plane.height; y++) {
     const srcStart = y * sourceStride
     const dstStart = y * bytesPerRow

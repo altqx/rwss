@@ -12,12 +12,13 @@ High-performance browser ASS/SSA subtitle renderer powered by the pure-Rust [`ra
 - Modern browser scheduling with `HTMLVideoElement.requestVideoFrameCallback` for video-backed render loops
 - ASS metadata, events, styles, timestamp list, and parser introspection APIs
 - Runtime track editing helpers for events/styles, style override, default font updates, and font injection
-- Browser font loading via configured font URLs/bytes and optional `queryLocalFonts`
-- Frame export helpers for `ImageData`, `ImageBitmap`, `Blob`, and canvas targets
-- WebGPU and WebGL2 image-composition surfaces for ASS planes, with CPU fallback for unsupported/headless runtimes
+- Browser font loading for TTF/OTF/TTC/OTC/WOFF/WOFF2 URLs or bytes, plus optional `queryLocalFonts`
+- Frame export helpers for `ImageData`, `ImageBitmap`, `Blob`, and canvas targets, including direct bounds-cropped WASM output
+- WebGPU and WebGL2 image-composition surfaces with direct no-readback presentation and CPU fallback for unsupported/headless runtimes
 - Exact-frame `requestVideoFrameCallback` sampling with encoded `frameTimeline` maps, HLS/Shaka clock-domain detection, and integer-millisecond rassa timestamps
 - Exact-frame prefetch runway (`framePrefetch`, default 2, max 24) that can defer `ready` / `trackReady` until the current frame and runway are prepared
 - Adaptive presentation-latency compensation, compositor refresh-grid reanchoring, and immediate prepared-frame commit on RVFC arrival
+- Static-cue reuse across video frames, while animated, karaoke, move, fade, and effect events remain time-sampled
 - Custom canvases stay on the main thread by default; worker/raw ASS WebGL2 composition is an explicit opt-in
 - Safety limits for fonts (32 MiB) and composed image planes (8192 images / 32M pixels)
 - Worker/offscreen client/runtime protocol for OffscreenCanvas rendering handoff, including prepare/present/frame-timeline messages
@@ -219,7 +220,7 @@ if (rendered) {
 
 Cropping modes:
 
-- `bounds` returns a tightly cropped composed image and records where it belongs in the original ASS presentation area via `offsetX` and `offsetY`.
+- `bounds` uses a direct WASM compositor, returns only the visible subtitle rectangle, and records its original placement via `offsetX` and `offsetY`.
 - `screen` preserves the full ASS presentation dimensions for stable test fixtures or full-frame exports.
 
 ## Fonts
@@ -244,7 +245,7 @@ await renderer.addFont('/fonts/Custom.ttf')
 renderer.setDefaultFont('Noto Sans CJK JP')
 ```
 
-Font inputs can be URLs, `Uint8Array`/`ArrayBuffer` bytes, or `RwssFontSource` objects with explicit `name`, `aliases`, `style`, and `isFallback` metadata.
+Font inputs can be URLs, `Uint8Array`/`ArrayBuffer` bytes, or `RwssFontSource` objects with explicit `name`, `aliases`, `style`, and `isFallback` metadata. TTF, OTF, TTC, OTC, WOFF, and WOFF2 inputs are accepted. Full-name and PostScript aliases are discovered automatically; an explicitly supplied attachment takes priority over an `availableFonts` fallback with the same family.
 
 ## Encrypted subtitle transport
 
@@ -324,21 +325,23 @@ await renderer.resetStats()
 
 ## GPU composition helpers
 
-Video-managed overlays automatically pick WebGPU → WebGL2 → Canvas2D. Custom canvases stay on Canvas2D so callers can keep `getContext()` / pixel readback. For lower-level integrations, `WebGPURenderer` and `WebGL2Renderer` expose ASS image-plane composition surfaces:
+Video-managed overlays use the bounds-cropped WASM + Canvas2D path by default. Set both `offscreenRender: true` and `rawAssImageGpu: true` to opt into direct WebGL2 plane presentation. For lower-level integrations, `WebGPURenderer` and `WebGL2Renderer` expose ASS image-plane composition surfaces:
 
 ```ts
 import { WebGPURenderer, WebGL2Renderer, isWebGPUSupported, isWebGL2Supported } from '@altqx/rwss'
 
 console.log({ webgpu: isWebGPUSupported(), webgl2: isWebGL2Supported() })
 
-const gpu = new WebGPURenderer({ canvas })
-const result = await gpu.renderAsync(assSubtitleData)
+const gpu = new WebGPURenderer(canvas)
+await gpu.present(assSubtitleData) // direct swapchain presentation
+const result = await gpu.renderAsync(assSubtitleData) // explicit readback
 
 const gl = new WebGL2Renderer(canvas)
-gl.render(assSubtitleData)
+gl.present(assSubtitleData) // direct framebuffer presentation
+const glResult = gl.render(assSubtitleData) // explicit readback
 ```
 
-Both GPU helpers return or draw `RwssImageCompositionResult` data, and unsupported/headless environments fall back to deterministic CPU composition.
+Both GPU helpers keep their readback APIs for export/tests while `present()` avoids the synchronous GPU-to-CPU path. Unsupported/headless environments retain deterministic CPU composition.
 
 ## Worker/offscreen rendering
 
@@ -397,7 +400,7 @@ client.destroy()
 - `setFrameTimeline(frameTimes): void` replaces or disables the encoded-frame timeline.
 - `setTrackByUrl(url): void`, `setTrack(content): void`, `setEncryptedTrack(content): void`, and `freeTrack(): void` manage subtitle tracks.
 - `rendererType`, `isUsingGPURenderer`, `framePrefetch`, `renderAhead`, and `timeOffset` expose live renderer state.
-- `setCurrentTime(isPaused?, currentTime?, rate?): void`, `setIsPaused(isPaused): void`, and `setRate(rate): void` control manual playback state.
+- `setCurrentTime(isPaused?, currentTime?, rate?, force?): void`, `setIsPaused(isPaused): void`, and `setRate(rate): void` control manual playback state.
 - `createEvent(event)`, `setEvent(event, index)`, `removeEvent(index)`, and `getEvents()` edit/read events.
 - `createStyle(style)`, `setStyle(style, index)`, `removeStyle(index)`, `getStyles()`, `styleOverride(style)`, and `disableStyleOverride()` edit/read styles.
 - `addFont(font, data?)` and `setDefaultFont(font)` manage fonts at runtime.

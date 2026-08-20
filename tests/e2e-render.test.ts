@@ -15,6 +15,7 @@ import init, {
 const ROOT = new URL('..', import.meta.url).pathname
 const ARTIFACT_DIR = join(ROOT, 'tests', 'artifacts')
 const WASM_PATH = join(ROOT, 'pkg', 'rwss_bg.wasm')
+const DEFAULT_WOFF2_PATH = join(ROOT, 'src', 'default.woff2')
 const FONT_CANDIDATES = [
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
   '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
@@ -41,7 +42,11 @@ Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0000,0000,0000,,{\\bord3\\shad1}rwss 
 describe('rwss browser/WASM rendering e2e', () => {
   test('renders ASS text through WASM + virtual fontconfig and writes a PNG artifact', async () => {
     const fontPath = await findUsableFont()
-    const [wasmBytes, fontBytes] = await Promise.all([readFile(WASM_PATH), readFile(fontPath)])
+    const [wasmBytes, fontBytes, defaultWoff2Bytes] = await Promise.all([
+      readFile(WASM_PATH),
+      readFile(fontPath),
+      readFile(DEFAULT_WOFF2_PATH)
+    ])
 
     await init({ module_or_path: wasmBytes })
     clearRegisteredFonts()
@@ -63,6 +68,27 @@ describe('rwss browser/WASM rendering e2e', () => {
     expect(frame.width).toBe(640)
     expect(frame.height).toBe(360)
     expect(frame.compositionData.length).toBeGreaterThan(0)
+    expect(frame.compositionData.every((plane: Plane) => plane.rgba instanceof Uint8Array)).toBeTrue()
+    expect(frame.compositionData.every((plane: Plane) => plane.stride === plane.width * 4)).toBeTrue()
+
+    const screenFrame = parser.renderFrameDataAtTimestamp(0.75)
+    expect(screenFrame.imageData).toBeInstanceOf(Uint8Array)
+    expect(screenFrame.imageWidth).toBe(640)
+    expect(screenFrame.imageHeight).toBe(360)
+    expect(screenFrame.imageData.length).toBe(640 * 360 * 4)
+
+    const boundsFrame = parser.renderFrameBoundsDataAtTimestamp(0.75)
+    expect(boundsFrame.imageData).toBeInstanceOf(Uint8Array)
+    expect(boundsFrame.crop).toBe('bounds')
+    expect(boundsFrame.imageData.length).toBe(boundsFrame.imageWidth * boundsFrame.imageHeight * 4)
+    expect(boundsFrame.imageData.length).toBeLessThan(screenFrame.imageData.length)
+
+    const emptyFrame = parser.renderFrameDataAtTimestamp(3)
+    expect(emptyFrame.compositionCount).toBe(0)
+    expect(emptyFrame.imageWidth).toBe(0)
+    expect(emptyFrame.imageHeight).toBe(0)
+    expect(emptyFrame.imageData).toBeInstanceOf(Uint8Array)
+    expect(emptyFrame.imageData.length).toBe(0)
 
     const rgba = compositePlanes(frame.width, frame.height, frame.compositionData)
     const coverage = alphaCoverage(rgba)
@@ -77,6 +103,33 @@ describe('rwss browser/WASM rendering e2e', () => {
     expect(png.byteLength).toBeGreaterThan(2048)
 
     parser.free()
+
+    // Akari registers available-font fallbacks before its attachment bytes. A
+    // valid attachment with the same family must still win that collision.
+    clearRegisteredFonts()
+    registerFontData(new Uint8Array(defaultWoff2Bytes), {
+      aliases: ['Missing Browser Font'],
+      isFallback: true
+    })
+    const attachedPath = registerFontData(new Uint8Array(fontBytes), {
+      aliases: ['Missing Browser Font'],
+      isFallback: false
+    })
+    expect(resolveFont('Missing Browser Font')?.path).toBe(attachedPath)
+    const collisionParser = openAss(SAMPLE_ASS)
+    expect(collisionParser.renderAtTimestamp(0.75).compositionData.length).toBeGreaterThan(0)
+    collisionParser.free()
+
+    clearRegisteredFonts()
+    registerFontData(new Uint8Array(defaultWoff2Bytes), {
+      aliases: ['Missing Browser Font'],
+      isFallback: true
+    })
+    const woffParser = openAss(SAMPLE_ASS)
+    const woffFrame = woffParser.renderAtTimestamp(0.75)
+    expect(woffFrame.compositionData.length).toBeGreaterThan(0)
+    expect(woffFrame.compositionData.every((plane: Plane) => plane.rgba instanceof Uint8Array)).toBeTrue()
+    woffParser.free()
   })
 })
 
@@ -97,6 +150,7 @@ type Plane = {
   y: number
   width: number
   height: number
+  stride: number
   rgba: Uint8Array | number[]
 }
 

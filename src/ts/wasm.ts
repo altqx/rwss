@@ -135,17 +135,16 @@ export async function registerAvailableFonts(fonts?: Record<string, string | Uin
   if (!fonts) return []
   await initWasm()
   if (options.fallbackFonts) setFallbackFonts(options.fallbackFonts)
+  const loaded = await Promise.all(Object.entries(fonts).map(async ([name, value]) => ({
+    name,
+    bytes: typeof value === 'string' ? await fetchFontBytes(value, options.timeoutMs) : value
+  })))
   const registered: string[] = []
-  for (const [name, value] of Object.entries(fonts)) {
+  for (const { name, bytes } of loaded) {
+    if (!bytes) continue
     const cleanName = normalizeFontFamily(name)
     const aliases = dedupeAliases([name, cleanName])
-    if (typeof value === 'string') {
-      const bytes = await fetchFontBytes(value, options.timeoutMs)
-      if (!bytes) continue
-      registered.push(registerFontBytes(cleanName, bytes, { aliases, isFallback: true }))
-      continue
-    }
-    registered.push(registerFontBytes(cleanName, value, { aliases, isFallback: true }))
+    registered.push(registerFontBytes(cleanName, bytes, { aliases, isFallback: true }))
   }
   return registered
 }
@@ -226,7 +225,9 @@ function toUint8Array(data: Uint8Array | ArrayBuffer | ArrayBufferView): Uint8Ar
 
 /** Wrap raw RGBA bytes in an ImageData. */
 export function imageDataFromBytes(bytes: Uint8Array | number[], width: number, height: number): ImageData {
-  const data = bytes instanceof Uint8Array ? new Uint8ClampedArray(bytes) : new Uint8ClampedArray(bytes)
+  const data = bytes instanceof Uint8Array && bytes.buffer instanceof ArrayBuffer
+    ? new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    : new Uint8ClampedArray(bytes)
   return new ImageData(data, width, height)
 }
 
@@ -236,10 +237,16 @@ export function planeToImageData(plane: RwssPlaneData): ImageData {
 }
 
 /** Normalize a WASM frame export into AssRenderedFrameData. */
-export function normalizeFrameData(raw: Omit<AssRenderedFrameData, 'imageData'> & { imageData: Uint8Array | number[] }): AssRenderedFrameData {
+export function normalizeFrameData(raw: Omit<AssRenderedFrameData, 'imageData'> & {
+  imageData: Uint8Array | number[]
+  imageWidth?: number
+  imageHeight?: number
+}): AssRenderedFrameData {
+  const width = raw.imageWidth ?? (raw.crop === 'bounds' ? raw.bounds?.width ?? 0 : raw.screenWidth)
+  const height = raw.imageHeight ?? (raw.crop === 'bounds' ? raw.bounds?.height ?? 0 : raw.screenHeight)
   return {
     ...raw,
-    imageData: imageDataFromBytes(raw.imageData, raw.screenWidth, raw.screenHeight)
+    imageData: imageDataFromBytes(raw.imageData, width, height)
   }
 }
 
@@ -273,8 +280,8 @@ export function renderFrameData(data: AssSubtitleData, options?: AssFrameRenderO
 /** Draw rendered frame data onto a canvas. */
 export function toCanvas(frame: AssRenderedFrameData, canvas?: HTMLCanvasElement | OffscreenCanvas): HTMLCanvasElement | OffscreenCanvas {
   const target = canvas ?? document.createElement('canvas')
-  target.width = frame.imageData.width
-  target.height = frame.imageData.height
+  if (target.width !== frame.imageData.width) target.width = frame.imageData.width
+  if (target.height !== frame.imageData.height) target.height = frame.imageData.height
   const ctx = target.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null
   if (!ctx) throw new Error('Canvas 2D context is unavailable')
   ctx.putImageData(frame.imageData, 0, 0)

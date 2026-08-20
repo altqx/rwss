@@ -159,6 +159,140 @@ describe('subtitle timing compensation', () => {
 })
 
 describe('AssRenderer exact-frame web features', () => {
+  test('skips duplicate renders within the same ASS millisecond unless forced', () => {
+    const canvas = {
+      width: 16,
+      height: 9,
+      style: {},
+      getContext: () => ({ clearRect() {}, drawImage() {}, putImageData() {} })
+    } as unknown as HTMLCanvasElement
+    const renderer = new AssRenderer({ canvas, subContent: '[Script Info]\n', autoLoad: false })
+    let renders = 0
+    const internals = renderer as unknown as {
+      opened: { renderFrameDataAtTimestamp: (time: number) => undefined; dispose: () => void }
+      paintSubtitleTime: (time: number, force: boolean) => boolean
+    }
+    internals.opened = {
+      renderFrameDataAtTimestamp: () => {
+        renders++
+        return undefined
+      },
+      dispose() {}
+    }
+
+    internals.paintSubtitleTime(1.0011, false)
+    internals.paintSubtitleTime(1.0019, false)
+    expect(renders).toBe(1)
+    internals.paintSubtitleTime(1.0019, true)
+    expect(renders).toBe(2)
+    renderer.destroy()
+  })
+
+  test('reuses static subtitle output across timestamps but not animated events', () => {
+    const canvas = {
+      width: 16,
+      height: 9,
+      style: {},
+      getContext: () => ({ clearRect() {}, drawImage() {}, putImageData() {} })
+    } as unknown as HTMLCanvasElement
+    const renderer = new AssRenderer({ canvas, subContent: '[Script Info]\n', autoLoad: false })
+    let renders = 0
+    const internals = renderer as unknown as {
+      opened: { renderFrameDataAtTimestamp: (time: number, options?: unknown) => undefined; dispose: () => void }
+      eventRenderRanges: Array<{ index: number; startMs: number; endMs: number; timeDependent: boolean }>
+      paintSubtitleTime: (time: number, force: boolean) => boolean
+      bumpRenderEpoch: () => void
+    }
+    internals.opened = {
+      renderFrameDataAtTimestamp: () => {
+        renders++
+        return undefined
+      },
+      dispose() {}
+    }
+    internals.eventRenderRanges = [{ index: 0, startMs: 0, endMs: 2_000, timeDependent: false }]
+
+    internals.paintSubtitleTime(0.1, false)
+    internals.paintSubtitleTime(0.2, false)
+    expect(renders).toBe(1)
+
+    internals.bumpRenderEpoch()
+    internals.eventRenderRanges[0].timeDependent = true
+    internals.paintSubtitleTime(0.3, false)
+    internals.paintSubtitleTime(0.4, false)
+    expect(renders).toBe(3)
+    renderer.destroy()
+  })
+
+  test('prefetches only future frames and yields between preparation tasks', async () => {
+    const canvas = {
+      width: 16,
+      height: 9,
+      style: {},
+      getContext: () => ({ clearRect() {}, drawImage() {}, putImageData() {} })
+    } as unknown as HTMLCanvasElement
+    const renderer = new AssRenderer({ canvas, subContent: '[Script Info]\n', autoLoad: false, framePrefetch: 2 })
+    const renderedTimes: number[] = []
+    const internals = renderer as unknown as {
+      opened: { renderFrameDataAtTimestamp: (time: number) => undefined; dispose: () => void }
+      frameTimeline: Float64Array
+      eventRenderRanges: Array<{ index: number; startMs: number; endMs: number; timeDependent: boolean }>
+      primePreparedFrames: (time: number) => void
+      dispatchNextPreparation: () => Promise<void>
+    }
+    internals.opened = {
+      renderFrameDataAtTimestamp: (time) => {
+        renderedTimes.push(time)
+        return undefined
+      },
+      dispose() {}
+    }
+    internals.frameTimeline = new Float64Array([0, 0.04, 0.08])
+    internals.eventRenderRanges = [{ index: 0, startMs: 0, endMs: 1_000, timeDependent: true }]
+
+    internals.primePreparedFrames(0)
+    await internals.dispatchNextPreparation()
+    expect(renderedTimes).toEqual([0.04])
+    await Bun.sleep(10)
+    expect(renderedTimes).toEqual([0.04, 0.08])
+    renderer.destroy()
+  })
+
+  test('yields non-blocking full-track warmup work to later tasks', async () => {
+    const canvas = {
+      width: 16,
+      height: 9,
+      style: {},
+      getContext: () => ({ clearRect() {}, drawImage() {}, putImageData() {} })
+    } as unknown as HTMLCanvasElement
+    const renderer = new AssRenderer({
+      canvas,
+      subContent: '[Script Info]\n',
+      autoLoad: false,
+      fullTrackWarmup: true,
+      fullTrackWarmupStep: 0.04
+    })
+    const warmed: number[] = []
+    const internals = renderer as unknown as {
+      opened: { timestamps: Float64Array; renderAtTimestamp: (time: number) => undefined; dispose: () => void }
+      maybeWarmTrack: () => Promise<void>
+    }
+    internals.opened = {
+      timestamps: new Float64Array([0, 0.08]),
+      renderAtTimestamp: (time) => {
+        warmed.push(time)
+        return undefined
+      },
+      dispose() {}
+    }
+
+    await internals.maybeWarmTrack()
+    expect(warmed).toEqual([])
+    await Bun.sleep(10)
+    expect(warmed).toEqual([0, 0.04, 0.08])
+    renderer.destroy()
+  })
+
   test('accepts and clears an encoded-frame timeline after construction', () => {
     const canvas = {
       width: 16,

@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "alloc-no-stdlib"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc7bb162ec39d46ab1ca8c77bf72e890535becd1751bb45f64c597edb4c8c6b3"
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -59,6 +65,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli-decompressor"
+version = "5.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a32acac15fe1967bc3986b2a6347dffc965602354ea6f450ad07e8bfd253583"
+dependencies = [
+ "alloc-no-stdlib",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -83,6 +98,12 @@ dependencies = [
  "quote",
  "syn 3.0.3",
 ]
+
+[[package]]
+name = "bytes"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cast"
@@ -681,9 +702,9 @@ dependencies = [
 
 [[package]]
 name = "rassa"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdfc4242418fbc38839337350b10c87f11eaa7a5d8733c20693f79b2920d2b26"
+checksum = "d821c8e14ca1c8d117cd00898d7c8e40ae11fd70f6621d178a20ef71dacd4f29"
 dependencies = [
  "rassa-capi",
  "rassa-core",
@@ -694,9 +715,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-capi"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b1b85b6d422a395ecdb351e14785e2b5207404ee1547fb71046fe05c7b43b61"
+checksum = "dc2d463b0b2f7e30902b959dced4fa46a35373d9298964ce1c5fc7e8da74a428"
 dependencies = [
  "cc",
  "libc",
@@ -709,15 +730,15 @@ dependencies = [
 
 [[package]]
 name = "rassa-core"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f365cf2adcef79d6237abf0c96ae2b30a238755a97a81aff9eec48f4dbe6371"
+checksum = "957419f70fbde6e9bece20d78ec6754c6e12ea65a7e1aef164f866ca604a7119"
 
 [[package]]
 name = "rassa-fonts"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a99006fe964870d777b32f8c3dc169da9fada723d35a4ea158f1749392e211aa"
+checksum = "9a507f1bd67064de47f854f830ed68beea2d5bb75ada65592fa03ad2ebb9fbac"
 dependencies = [
  "encoding_rs",
  "fontdb",
@@ -726,9 +747,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-layout"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77671a9c345d4970ca9853ba4d721c52ae4850efa5ef691ca36213e01e6bd2d1"
+checksum = "1fa2c31767a2557fb9351b9fb9ccec1285c1cf7f6dba2814e142677bf219fd04"
 dependencies = [
  "rassa-core",
  "rassa-fonts",
@@ -741,9 +762,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-parse"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf2263165e4254124bb4d3394f9f2f75340e8d65e3aa5bc9f79c10683e4c6815"
+checksum = "c12fb262033bf38838b3969f43c14ff67e7e961698e087f3dc9eecbdd8c0d44c"
 dependencies = [
  "iconv-native",
  "rassa-core",
@@ -751,9 +772,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-raster"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c6365cbf641c529eb4f014b29ba50b1950cc24d93cf9cc0b0133d68209483f"
+checksum = "4a96e49a78c36ee3c9191de5ae8b5d38e601f760c38d6587f767a88f8298ff2a"
 dependencies = [
  "core-foundation",
  "core-foundation-sys",
@@ -780,9 +801,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-render"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3f7622c8f03889776ec9bdc421433bf9d557d52979b75541289a32ea30e3aa3"
+checksum = "d55702abb2457163d00e6d2dfb86bf7ec9bdabb70662dd2398ebe4784638bdac"
 dependencies = [
  "freetype-rs",
  "rassa-core",
@@ -796,9 +817,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-shape"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16a7de1a2328ce4d54dcb5201ad278fdb15398658e4acb361c257d98671706a7"
+checksum = "db43d015f78d972d5477e37154d2bf4f2f4e44a59a7548b6e09cf6d85e5eeb06"
 dependencies = [
  "harfrust",
  "rassa-core",
@@ -809,9 +830,9 @@ dependencies = [
 
 [[package]]
 name = "rassa-unicode"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd057ce8cb35d7e84ca8444f6b97e3e16d0080c1dd395be06b604094cce161fb"
+checksum = "f10693e151b8bfcf9e45847d3c56b90116b7694946929e97c56fa41236e61b07"
 dependencies = [
  "rassa-core",
  "unicode-bidi",
@@ -885,9 +906,11 @@ dependencies = [
  "rassa-shape",
  "serde",
  "serde-wasm-bindgen",
+ "serde_bytes",
  "ttf-parser",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wuff",
 ]
 
 [[package]]
@@ -918,6 +941,16 @@ dependencies = [
  "js-sys",
  "serde",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -1403,6 +1436,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d129932f4644ac2396cb456385cbf9e63b5b30c6e8dc4820bdca4eb082037a5"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "wuff"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f625c6894838ab68e8c1c6e0f728e67363c9d4391cfa82333e58e6e30bc3a627"
+dependencies = [
+ "brotli-decompressor",
+ "bytes",
+ "flate2",
 ]
 
 [[package]]

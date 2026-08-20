@@ -17,6 +17,7 @@ import { decryptSubtitleContent } from './crypto'
 import {
   DEFAULT_AVAILABLE_FONTS,
   DEFAULT_FALLBACK_FONTS,
+  getAssBounds,
   initWasm,
   registerAvailableFonts,
   registerFont,
@@ -25,14 +26,14 @@ import {
   toCanvas
 } from './wasm'
 import { computeRenderSize, dropBlur, getVideoPosition } from './utils'
-import { WebGPURenderer, isWebGPUSupported } from './webgpu-renderer'
-import { WebGL2Renderer, isWebGL2Supported } from './webgl2-renderer'
+import { WebGL2Renderer } from './webgl2-renderer'
 import {
   compensatedMediaTime,
   normalizeFrameTimeline,
   presentedFrameIndex,
   presentationLeadSeconds,
   resolvePresentationMediaTime,
+  secondsToAssMs,
   selectRenderMediaTime,
   subtitleTimeForFrame,
   updateTimingCompensation
@@ -50,7 +51,16 @@ interface PreparedFrame {
   width: number
   height: number
   frame?: AssRenderedFrameData
+  data?: ReturnType<AssParser['renderAtTimestamp']>
   planes?: number
+  staticFrameKey?: string
+}
+
+interface EventRenderRange {
+  index: number
+  startMs: number
+  endMs: number
+  timeDependent: boolean
 }
 
 const DEFAULT_RENDER_AHEAD = 0
@@ -83,7 +93,8 @@ export class AssRenderer extends EventTarget {
   private minRenderTime = 0
   private maxRenderTime = 0
   private totalRenderTime = 0
-  private lastCueKey = ''
+  private lastRenderedAssMs?: number
+  private lastStaticFrameKey?: string
   private lastImageCount = 0
   private lastImagePixels = 0
   private cacheHits = 0
@@ -91,16 +102,21 @@ export class AssRenderer extends EventTarget {
   private currentTrackText = ''
   private state: RendererState = { isPaused: true, currentTime: 0, rate: 1 }
   private events: ASSEvent[] = []
+  private eventRenderRanges: EventRenderRange[] = []
   private styles: ASSStyle[] = []
   private styleOverridePatch: Partial<ASSStyle> | null = null
   private readonly addedFonts: (string | Uint8Array | RwssFontSource)[] = []
+  private registeredAddedFontCount = 0
   private defaultFont = 'sans'
-  private gpuRenderer: WebGPURenderer | WebGL2Renderer | null = null
+  private gpuRenderer: WebGL2Renderer | null = null
   private backend: RwssRendererBackend = 'canvas2d'
+  private frameCanvas?: HTMLCanvasElement | OffscreenCanvas
   private frameTimeline: (Float64Array & { mediaTimeOrigin?: number; subtitleTimeOffset?: number }) | null = null
   private preparedFrames = new Map<number, PreparedFrame>()
   private prepareQueue: number[] = []
   private preparing = false
+  private preparationTimer?: ReturnType<typeof setTimeout>
+  private warmupTimer?: ReturnType<typeof setTimeout>
   private renderEpoch = 0
   private nextPresentationId = 1
   private latestPresentationId = 0
@@ -178,11 +194,12 @@ export class AssRenderer extends EventTarget {
     this.defaultFont = this.options.fallbackFonts?.[0] ?? this.defaultFont
     this.addedFonts.push(...(this.options.fonts ?? []))
     this.canvas = options.canvas ?? this.createOverlayCanvas(options.video!)
-    this.ctx = this.canvas.getContext('2d', { alpha: true, desynchronized: true })
-    if (!this.ctx) throw new Error('Canvas rendering not supported')
-
-    if (!this.isCustomCanvas) this.initManagedGpuRenderer()
-    if (this.backend === 'canvas2d') this.options.onCanvasFallback?.()
+    if (this.rawAssImageGpu && this.wantsOffscreenRender) this.initManagedGpuRenderer()
+    if (!this.gpuRenderer) {
+      this.ctx = this.canvas.getContext('2d', { alpha: true, desynchronized: true })
+      if (!this.ctx) throw new Error('Canvas rendering not supported')
+      this.options.onCanvasFallback?.()
+    }
     if (options.video) this.setVideo(options.video)
     // load() already reports failures through onError and the error event.
     // Consume the constructor-started promise so those failures do not also
@@ -236,7 +253,7 @@ export class AssRenderer extends EventTarget {
     let lastTick = 0
     const tick = (now: number) => {
       this.raf = requestAnimationFrame(tick)
-      if (this.options.onDemandRender === false && now - lastTick < interval) return
+      if (now - lastTick < interval) return
       lastTick = now
       this.renderCurrentTime()
     }
@@ -275,7 +292,7 @@ export class AssRenderer extends EventTarget {
         video.addEventListener(type, this.boundTimeUpdate, false)
       }
       video.addEventListener('ratechange', this.boundSetRate, false)
-      if (!this.onDemandRender) video.addEventListener('resize', this.boundResize, false)
+      video.addEventListener('resize', this.boundResize, false)
     }
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver ??= new ResizeObserver(() => this.resize())
@@ -293,7 +310,7 @@ export class AssRenderer extends EventTarget {
     this.bumpRenderEpoch()
     this.syncVideoClock()
     this.primePreparedFrames(this.currentExactFrameMediaTime())
-    void this.dispatchNextPreparation()
+    this.scheduleNextPreparation()
   }
 
   /** Emit a simple render-timing debug message. */
@@ -334,8 +351,9 @@ export class AssRenderer extends EventTarget {
     this.opened = undefined
     this.currentTrackText = ''
     this.events = []
+    this.eventRenderRanges = []
     this.styles = []
-    this.lastCueKey = ''
+    this.lastRenderedAssMs = undefined
     this.clearCanvas()
   }
 
@@ -352,11 +370,11 @@ export class AssRenderer extends EventTarget {
   }
 
   /** Override paused/currentTime/rate together for manual clock control. */
-  setCurrentTime(isPaused?: boolean, currentTime?: number, rate?: number): void {
+  setCurrentTime(isPaused?: boolean, currentTime?: number, rate?: number, force = true): void {
     if (typeof isPaused === 'boolean') this.state.isPaused = isPaused
     if (typeof currentTime === 'number') this.state.currentTime = currentTime
     if (typeof rate === 'number') this.state.rate = rate
-    this.renderAtMediaTime((currentTime ?? this.state.currentTime) - this.timeOffset, true)
+    this.renderAtMediaTime((currentTime ?? this.state.currentTime) - this.timeOffset, force)
   }
 
   /** Append an ASS event and rebuild the in-memory track. */
@@ -430,11 +448,17 @@ export class AssRenderer extends EventTarget {
     } else if (source instanceof Uint8Array && source.byteLength > MAX_FONT_BYTES) {
       throw new Error('Font files are limited to 32 MiB')
     }
+    const sourceIndex = this.addedFonts.length
     this.addedFonts.push(source)
+    await initWasm(this.options.wasmUrl)
     let registeredPath: string | undefined
     if (typeof source === 'string') registeredPath = await registerFont(source, undefined, { isFallback: false })
     else if (source instanceof Uint8Array) registeredPath = registerFontData(source, { isFallback: false })
     else registeredPath = await registerFont(source, undefined, { isFallback: false })
+    if (this.registeredAddedFontCount === sourceIndex) {
+      this.registeredAddedFontCount = sourceIndex + 1
+    }
+    this.bumpRenderEpoch()
     this.emitEvent({ type: 'message', target: 'addFont', data: { font: source, path: registeredPath } })
     return registeredPath
   }
@@ -501,6 +525,13 @@ export class AssRenderer extends EventTarget {
     this.gpuRenderer?.destroy()
     this.opened?.dispose()
     this.preparedFrames.clear()
+    if (this.preparationTimer !== undefined) clearTimeout(this.preparationTimer)
+    if (this.warmupTimer !== undefined) clearTimeout(this.warmupTimer)
+    if (this.frameCanvas) {
+      this.frameCanvas.width = 1
+      this.frameCanvas.height = 1
+      this.frameCanvas = undefined
+    }
     if (!this.options.canvas) {
       this.canvas.remove()
       this.canvasParent?.remove()
@@ -588,7 +619,7 @@ export class AssRenderer extends EventTarget {
     }
 
     if (!presented) this.renderAtMediaTime(mediaTime, false, presentationId, isPaused ? undefined : expectedDisplayTime)
-    void this.dispatchNextPreparation()
+    this.scheduleNextPreparation()
     this.scheduleRVFC(this.options.video!)
   }
 
@@ -629,22 +660,27 @@ export class AssRenderer extends EventTarget {
 
   private paintSubtitleTime(time: number, force: boolean): boolean {
     if (!this.opened) return false
-    const started = performance.now()
-    const planes = this.options.blendMode === 'js' || this.rawAssImageGpu ? this.opened.renderAtTimestamp(time) : undefined
-    const frame = planes && this.options.blendMode === 'js'
-      ? undefined
-      : this.opened.renderFrameDataAtTimestamp(time)
-    const compositionCount = planes?.compositionData.length ?? frame?.compositionCount ?? 0
-    const bounds = frame?.bounds ?? null
-    const cueKey = `${time.toFixed(4)}:${compositionCount}:${bounds?.x ?? -1}:${bounds?.y ?? -1}`
-    this.layoutCanvas()
-    if (!force && cueKey === this.lastCueKey) {
+    const assTimeMs = secondsToAssMs(time)
+    if (!force && assTimeMs === this.lastRenderedAssMs) {
       this.cacheHits++
       return false
     }
-    this.lastCueKey = cueKey
+    const staticFrameKey = this.staticFrameKeyAt(assTimeMs)
+    if (!force && staticFrameKey !== undefined && staticFrameKey === this.lastStaticFrameKey) {
+      this.cacheHits++
+      return false
+    }
+    const started = performance.now()
+    const planes = this.gpuRenderer ? this.opened.renderAtTimestamp(time) : undefined
+    const frame = this.gpuRenderer ? undefined : this.opened.renderFrameDataAtTimestamp(time, { crop: 'bounds' })
+    const compositionCount = planes?.compositionData.length ?? frame?.compositionCount ?? 0
+    const bounds = frame?.bounds ?? (planes ? getAssBounds(planes.compositionData) : null)
     this.cacheMisses++
     const painted = this.presentFrame(frame, planes, time)
+    if (painted) {
+      this.lastRenderedAssMs = assTimeMs
+      this.lastStaticFrameKey = staticFrameKey
+    }
     const renderTime = performance.now() - started
     this.lastImageCount = compositionCount
     this.lastImagePixels = planes
@@ -667,15 +703,39 @@ export class AssRenderer extends EventTarget {
 
   private presentFrame(frame: AssRenderedFrameData | undefined, planes: ReturnType<AssParser['renderAtTimestamp']>, _time: number): boolean {
     try {
-      if (this.gpuRenderer && planes && (this.rawAssImageGpu || this.backend !== 'canvas2d')) {
-        this.gpuRenderer.render(planes)
+      if (this.gpuRenderer && planes) {
+        this.gpuRenderer.present(planes)
         return true
       }
       if (!this.ctx) return false
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
       if (frame) {
-        const bitmapCanvas = toCanvas(frame) as HTMLCanvasElement
-        this.ctx.drawImage(bitmapCanvas, 0, 0, this.canvas.width, this.canvas.height)
+        const screenSized = frame.offsetX === 0
+          && frame.offsetY === 0
+          && frame.imageData.width === this.canvas.width
+          && frame.imageData.height === this.canvas.height
+        if (screenSized) {
+          this.ctx.putImageData(frame.imageData, 0, 0)
+        } else if (frame.screenWidth === this.canvas.width && frame.screenHeight === this.canvas.height) {
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+          this.ctx.putImageData(frame.imageData, frame.offsetX, frame.offsetY)
+        } else {
+          this.frameCanvas ??= typeof OffscreenCanvas !== 'undefined'
+            ? new OffscreenCanvas(frame.imageData.width, frame.imageData.height)
+            : document.createElement('canvas')
+          const bitmapCanvas = toCanvas(frame, this.frameCanvas)
+          const scaleX = this.canvas.width / Math.max(1, frame.screenWidth)
+          const scaleY = this.canvas.height / Math.max(1, frame.screenHeight)
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+          this.ctx.drawImage(
+            bitmapCanvas,
+            frame.offsetX * scaleX,
+            frame.offsetY * scaleY,
+            frame.imageData.width * scaleX,
+            frame.imageData.height * scaleY
+          )
+        }
+      } else {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
       }
       return true
     } catch (error) {
@@ -690,7 +750,14 @@ export class AssRenderer extends EventTarget {
       return
     }
     this.latestPresentationId = presentationId
-    const painted = this.presentFrame(prepared.frame, undefined, prepared.time)
+    const reusesCurrentFrame = prepared.staticFrameKey !== undefined
+      && prepared.staticFrameKey === this.lastStaticFrameKey
+    if (reusesCurrentFrame) this.cacheHits++
+    const painted = reusesCurrentFrame || this.presentFrame(prepared.frame, prepared.data, prepared.time)
+    if (painted) {
+      this.lastRenderedAssMs = secondsToAssMs(prepared.time)
+      this.lastStaticFrameKey = prepared.staticFrameKey
+    }
     if (!painted) this.framesDropped++
     this.emitEvent({
       type: 'render',
@@ -709,37 +776,72 @@ export class AssRenderer extends EventTarget {
     const currentIndex = presentedFrameIndex(timeline, mediaTime)
     const lastIndex = Math.min(timeline.length - 1, currentIndex + this.framePrefetch)
     for (const [index] of this.preparedFrames) {
-      if (index < currentIndex || index > lastIndex) this.preparedFrames.delete(index)
+      if (index <= currentIndex || index > lastIndex) this.preparedFrames.delete(index)
     }
     this.prepareQueue = this.prepareQueue.filter((index) => index > currentIndex && index <= lastIndex)
     const requested = new Set([...this.preparedFrames.keys(), ...this.prepareQueue])
-    for (let index = Math.max(0, currentIndex); index <= lastIndex; index++) {
+    for (let index = Math.max(0, currentIndex + 1); index <= lastIndex; index++) {
       if (!requested.has(index)) this.prepareQueue.push(index)
     }
   }
 
-  private async dispatchNextPreparation(): Promise<void> {
+  private async dispatchNextPreparation(drain = false): Promise<void> {
     if (this.preparing || !this.opened || !this.frameTimeline || this.framePrefetch <= 0) return
     this.preparing = true
+    const epoch = this.renderEpoch
     try {
       while (this.prepareQueue.length > 0 && !this.destroyed) {
         const index = this.prepareQueue.shift()
         if (index == null || this.preparedFrames.has(index)) continue
         const time = subtitleTimeForFrame(this.frameTimeline, index)
         if (!Number.isFinite(time)) continue
-        const frame = this.opened.renderFrameDataAtTimestamp(time + this.timeOffset)
+        const renderTime = time + this.timeOffset
+        const staticFrameKey = this.staticFrameKeyAt(secondsToAssMs(renderTime))
+        let reusable: PreparedFrame | undefined
+        if (staticFrameKey !== undefined) {
+          for (const prepared of this.preparedFrames.values()) {
+            if (prepared.staticFrameKey === staticFrameKey) {
+              reusable = prepared
+              break
+            }
+          }
+        }
+        const reuseCurrentFrame = staticFrameKey !== undefined && staticFrameKey === this.lastStaticFrameKey
+        const data = reusable
+          ? reusable.data
+          : reuseCurrentFrame || !this.gpuRenderer
+            ? undefined
+            : this.opened.renderAtTimestamp(renderTime)
+        const frame = reusable
+          ? reusable.frame
+          : reuseCurrentFrame || this.gpuRenderer
+            ? undefined
+            : this.opened.renderFrameDataAtTimestamp(renderTime, { crop: 'bounds' })
+        if (epoch !== this.renderEpoch || this.destroyed) return
         this.preparedFrames.set(index, {
           index,
-          time: time + this.timeOffset,
-          width: frame?.screenWidth ?? this.canvas.width,
-          height: frame?.screenHeight ?? this.canvas.height,
+          time: renderTime,
+          width: frame?.screenWidth ?? data?.width ?? this.canvas.width,
+          height: frame?.screenHeight ?? data?.height ?? this.canvas.height,
           frame,
-          planes: frame?.compositionCount
+          data,
+          planes: reusable?.planes ?? (reuseCurrentFrame ? this.lastImageCount : frame?.compositionCount ?? data?.compositionData.length),
+          staticFrameKey
         })
+        if (!drain) break
       }
     } finally {
       this.preparing = false
     }
+    if (!drain && this.prepareQueue.length > 0 && !this.destroyed) this.scheduleNextPreparation()
+  }
+
+  private scheduleNextPreparation(): void {
+    if (this.preparationTimer !== undefined || this.destroyed) return
+    this.preparationTimer = setTimeout(() => {
+      this.preparationTimer = undefined
+      void this.dispatchNextPreparation()
+    }, 0)
   }
 
   private async fillExactFrameRunway(): Promise<void> {
@@ -747,7 +849,7 @@ export class AssRenderer extends EventTarget {
     const mediaTime = this.currentExactFrameMediaTime()
     this.renderAtMediaTime(mediaTime, true)
     this.primePreparedFrames(mediaTime)
-    await this.dispatchNextPreparation()
+    await this.dispatchNextPreparation(true)
   }
 
   private shouldBufferExactFrames(): boolean {
@@ -795,7 +897,7 @@ export class AssRenderer extends EventTarget {
       this.renderAtMediaTime(video.currentTime, true)
       if (this.shouldBufferExactFrames()) {
         this.primePreparedFrames(this.currentExactFrameMediaTime())
-        void this.dispatchNextPreparation()
+        this.scheduleNextPreparation()
       }
     }
   }
@@ -824,7 +926,16 @@ export class AssRenderer extends EventTarget {
     this.renderEpoch++
     this.preparedFrames.clear()
     this.prepareQueue.length = 0
-    this.lastCueKey = ''
+    this.lastRenderedAssMs = undefined
+    this.lastStaticFrameKey = undefined
+    if (this.preparationTimer !== undefined) {
+      clearTimeout(this.preparationTimer)
+      this.preparationTimer = undefined
+    }
+    if (this.warmupTimer !== undefined) {
+      clearTimeout(this.warmupTimer)
+      this.warmupTimer = undefined
+    }
   }
 
   private async reloadFromOptions(): Promise<void> {
@@ -840,6 +951,7 @@ export class AssRenderer extends EventTarget {
     this.currentTrackText = prepared
     this.opened = (await openAss(prepared, this.options.wasmUrl)) as AssParser
     this.events = this.opened.getEvents().map((event) => ({ ...event }))
+    this.rebuildEventRenderRanges()
     this.styles = this.opened.getStyles().map((style) => ({ ...style }))
     await this.maybeWarmTrack()
     if (this.shouldBufferExactFrames()) await this.fillExactFrameRunway()
@@ -859,14 +971,22 @@ export class AssRenderer extends EventTarget {
     const times = this.opened.timestamps
     if (!times.length) return
     const last = times[times.length - 1]
-    const warmup = () => {
-      for (let time = times[0]; time <= last; time += step) this.opened?.renderAtTimestamp(time)
-    }
-    if (this.options.blockingFullTrackWarmup) warmup()
-    else {
+    if (this.options.blockingFullTrackWarmup) {
+      for (let time = times[0]; time <= last; time += step) this.opened.renderAtTimestamp(time)
+    } else {
       this.emitEvent({ type: 'partial-ready' })
       this.dispatchEvent(new CustomEvent('partial_ready'))
-      warmup()
+      const opened = this.opened
+      const epoch = this.renderEpoch
+      let time = times[0]
+      const warmNext = () => {
+        this.warmupTimer = undefined
+        if (this.destroyed || epoch !== this.renderEpoch || this.opened !== opened || time > last) return
+        opened.renderAtTimestamp(time)
+        time += step
+        this.warmupTimer = setTimeout(warmNext, 0)
+      }
+      this.warmupTimer = setTimeout(warmNext, 0)
     }
   }
 
@@ -894,11 +1014,12 @@ export class AssRenderer extends EventTarget {
     const selectedAvailableFonts = selectAvailableFonts(availableFonts, fallbackFonts, requestedFamilies)
     await registerAvailableFonts(selectedAvailableFonts, { fallbackFonts })
     if (this.options.useFontconfigProvider !== false) await this.registerLocalFonts(requestedFamilies)
-    for (const font of this.addedFonts) {
+    for (const font of this.addedFonts.slice(this.registeredAddedFontCount)) {
       if (typeof font === 'string') await registerFont(font, undefined, { isFallback: false })
       else if (font instanceof Uint8Array) registerFontData(font, { isFallback: false })
       else await registerFont(font, undefined, { isFallback: false })
     }
+    this.registeredAddedFontCount = this.addedFonts.length
   }
 
   private async registerLocalFonts(requestedFamilies: string[]): Promise<void> {
@@ -926,6 +1047,28 @@ export class AssRenderer extends EventTarget {
     return this.styles.map((style) => ({ ...style, ...this.styleOverridePatch }))
   }
 
+  private rebuildEventRenderRanges(): void {
+    this.eventRenderRanges = this.events.map((event, index) => {
+      const startMs = secondsToAssMs(event.Start)
+      return {
+        index,
+        startMs,
+        endMs: startMs + Math.max(0, secondsToAssMs(event.Duration)),
+        timeDependent: eventIsTimeDependent(event)
+      }
+    })
+  }
+
+  private staticFrameKeyAt(timeMs: number): string | undefined {
+    const active: number[] = []
+    for (const event of this.eventRenderRanges) {
+      if (timeMs < event.startMs || timeMs >= event.endMs) continue
+      if (event.timeDependent) return undefined
+      active.push(event.index)
+    }
+    return active.join(',')
+  }
+
   private recordRenderTime(value: number): void {
     this.lastRenderTime = value
     this.totalRenderTime += value
@@ -935,19 +1078,12 @@ export class AssRenderer extends EventTarget {
   }
 
   private initManagedGpuRenderer(): void {
-    if (this.isLikelyWebKit) return
+    if (this.isLikelyWebKit || !this.rawAssImageGpu) return
     try {
-      if (isWebGPUSupported()) {
-        this.gpuRenderer = new WebGPURenderer(this.canvas)
-        this.backend = 'webgpu'
-        void this.gpuRenderer.init()
-        return
-      }
-      if (isWebGL2Supported()) {
-        this.gpuRenderer = new WebGL2Renderer(this.canvas)
-        this.backend = 'webgl2'
-        void this.gpuRenderer.init()
-      }
+      const renderer = new WebGL2Renderer(this.canvas)
+      if (!renderer.initialized) return
+      this.gpuRenderer = renderer
+      this.backend = 'webgl2'
     } catch {
       this.gpuRenderer = null
       this.backend = 'canvas2d'
@@ -996,7 +1132,8 @@ export class AssRenderer extends EventTarget {
   }
 
   private clearCanvas(): void {
-    this.ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    if (this.gpuRenderer) this.gpuRenderer.clear()
+    else this.ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height)
   }
 
   private createOverlayCanvas(video: HTMLVideoElement): HTMLCanvasElement {
@@ -1075,6 +1212,12 @@ function clampPrefetch(value: number): number {
 
 function dropAnimations(text: string): string {
   return text.replace(/\\(?:move|t|fad|fade|org)\b[^\\}]*/gi, '')
+}
+
+function eventIsTimeDependent(event: ASSEvent): boolean {
+  if (event.Effect.trim()) return true
+  return /\\(?:t|move|fad|fade)\s*\(/i.test(event.Text)
+    || /\\(?:k|kf|ko|kt)\s*-?\d/i.test(event.Text)
 }
 
 function selectAvailableFonts(

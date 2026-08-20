@@ -10,6 +10,7 @@ const GL = {
   LINK_STATUS: 0x8B82,
   ARRAY_BUFFER: 0x8892,
   STATIC_DRAW: 0x88E4,
+  DYNAMIC_DRAW: 0x88E8,
   FLOAT: 0x1406,
   TEXTURE_2D: 0x0DE1,
   TEXTURE0: 0x84C0,
@@ -42,6 +43,7 @@ class FakeWebGL2RenderingContext {
   readonly LINK_STATUS = GL.LINK_STATUS
   readonly ARRAY_BUFFER = GL.ARRAY_BUFFER
   readonly STATIC_DRAW = GL.STATIC_DRAW
+  readonly DYNAMIC_DRAW = GL.DYNAMIC_DRAW
   readonly FLOAT = GL.FLOAT
   readonly TEXTURE_2D = GL.TEXTURE_2D
   readonly TEXTURE0 = GL.TEXTURE0
@@ -81,8 +83,12 @@ class FakeWebGL2RenderingContext {
   bindVertexArray() { this.calls.push('bindVertexArray') }
   createBuffer() { this.calls.push('createBuffer'); return {} }
   bindBuffer(_target: number, buffer: { data?: Float32Array } | null) { this.currentArrayBuffer = buffer; this.calls.push('bindBuffer') }
-  bufferData(_target: number, data: Float32Array) {
+  bufferData(_target: number, data: Float32Array | number) {
     this.calls.push('bufferData')
+    if (this.currentArrayBuffer && data instanceof Float32Array) this.currentArrayBuffer.data = data
+  }
+  bufferSubData(_target: number, _offset: number, data: Float32Array) {
+    this.calls.push('bufferSubData')
     if (this.currentArrayBuffer) this.currentArrayBuffer.data = data
     this.drawnVertexData.push([...data])
   }
@@ -160,11 +166,68 @@ describe('real WebGL2 compositor path', () => {
     expect(gl.calls).toContain('drawArrays:6')
     expect(gl.calls).toContain('readPixels:2x2')
     expect(gl.uploadedTextures[0].data).toEqual([...frame.compositionData[0].rgba])
+    expect(gl.drawnVertexData[0]).toEqual([
+      -1, 1, 0, 0,
+      1, 1, 1, 0,
+      -1, 0, 0, 1,
+      -1, 0, 0, 1,
+      1, 1, 1, 0,
+      1, 0, 1, 1
+    ])
     expect([...result.rgba]).toEqual([
       255, 0, 0, 255, 0, 255, 0, 128,
       0, 0, 255, 255, 0, 0, 0, 0
     ])
     expect(result.nonTransparentPixels).toBe(3)
     expect(result.alphaSum).toBe(638)
+  })
+
+  test('presents directly without readback and reuses its texture and vertex resources', () => {
+    const gl = new FakeWebGL2RenderingContext()
+    const canvas = {
+      width: 2,
+      height: 2,
+      getContext: (kind: string) => kind === 'webgl2' ? gl : null
+    }
+    const renderer = new WebGL2Renderer(canvas as unknown as HTMLCanvasElement)
+    const twoPlanes: AssSubtitleData = {
+      ...frame,
+      compositionData: [frame.compositionData[0], { ...frame.compositionData[0], y: 1 }]
+    }
+
+    renderer.present(twoPlanes)
+    renderer.present(twoPlanes)
+
+    expect(gl.calls.filter((call) => call === 'createTexture')).toHaveLength(1)
+    expect(gl.calls.filter((call) => call === 'createBuffer')).toHaveLength(1)
+    expect(gl.calls.filter((call) => call === 'bufferSubData')).toHaveLength(4)
+    expect(gl.calls.filter((call) => call.startsWith('readPixels:'))).toHaveLength(0)
+    expect(gl.calls).not.toContain('deleteTexture')
+    expect(gl.drawnVertexData).toHaveLength(4)
+
+    renderer.destroy()
+    expect(gl.calls.filter((call) => call === 'deleteTexture')).toHaveLength(1)
+  })
+
+  test('does not reset unchanged canvas dimensions', () => {
+    const gl = new FakeWebGL2RenderingContext()
+    let width = 2
+    let height = 2
+    let widthWrites = 0
+    let heightWrites = 0
+    const canvas = {
+      get width() { return width },
+      set width(value: number) { width = value; widthWrites++ },
+      get height() { return height },
+      set height(value: number) { height = value; heightWrites++ },
+      getContext: (kind: string) => kind === 'webgl2' ? gl : null
+    }
+    const renderer = new WebGL2Renderer(canvas as unknown as HTMLCanvasElement)
+
+    renderer.present(frame)
+    renderer.updateSize(2, 2)
+
+    expect(widthWrites).toBe(0)
+    expect(heightWrites).toBe(0)
   })
 })
